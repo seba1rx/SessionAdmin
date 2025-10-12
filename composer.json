@@ -11,15 +11,24 @@
     ],
     "autoload": {
         "psr-4": {
-            "Seba1rx\\": "src/"
+            "Seba1rx\\SessionAdmin\\": "src/"
         }
     },
     "scripts": {
         "post-install-cmd": [
-            "@php -r \"copy(getcwd() . '/vendor/seba1rx/sessionadmin/script/seba1rx_sessionAdmin.js', getcwd() . '/seba1rx_sessionAdmin.js');\""
+            "Seba1rx\\ComposerScripts::publishAssets"
         ],
         "post-update-cmd": [
-            "@php -r \"copy(getcwd() . '/vendor/seba1rx/sessionadmin/script/seba1rx_sessionAdmin.js', getcwd() . '/seba1rx_sessionAdmin.js');\""
+            "Seba1rx\\ComposerScripts::publishAssets"
+        ],
+        "publish-assets": [
+            "Seba1rx\\ComposerScripts::publishAssets"
         ]
-    }
+    },
+    "extra": {
+        "publish": {
+            "scripts/seba1rx_sessionAdmin.js": "seba1rx_sessionAdmin.js"
+        }
+    },
+    "require": {}
 }
