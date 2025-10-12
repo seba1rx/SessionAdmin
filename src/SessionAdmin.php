@@ -1,6 +1,6 @@
 <?php
 
-namespace Seba1rx;
+namespace Seba1rx\SessionAdmin;
 
 /**
  * Extend this class to customize it by creating your own constructor
@@ -12,22 +12,107 @@ namespace Seba1rx;
 abstract class SessionAdmin{
 
     const IP_REGEX = '/(\d{1,3}\.\d{1,3}\.\d{1,3}\.)(\d{1,3})/';
+
+    /**
+     * The secconds the session will be alive between requests
+     *
+     * @var integer
+     */
     protected $sessionLifetime = 2400;
+
+    /**
+     * The session name that will be used
+     *
+     * @var string
+     */
     protected $sessionName = 'SESSION';
+
+    /**
+     * array list containing the file names that will be checked in the authorization process
+     *
+     * @var array
+     */
     protected $allowedUrls = [];
+
+    /**
+     * assoc array that you can pass to load into the session
+     *
+     * @var array
+     */
     protected $keys = [];
-    private $path = '/';
-    private $domain = NULL;
-    private $secure = NULL;
+
+    /**
+     * Path on the domain where the cookie will work. Use a single slash ('/') for all paths on the domain.
+     * used in session_set_cookie_params()
+     * it is set to protected in case you want to change the value in your implementation
+    *
+    * @var string
+    */
+    protected $path = '/';
+
+    /**
+     * Cookie domain, for example 'www.php.net'. To make cookies visible on all subdomains then the domain must be prefixed with a dot like '.php.net'.
+     * used in session_set_cookie_params()
+     * it is set to protected in case you want to change the value in your implementation
+    *
+    * @var string|null
+    */
+    protected $domain = NULL;
+
+    /**
+     * If true cookie will only be sent over secure connections.
+     * used in session_set_cookie_params()
+     * it is set to protected in case you want to change the value in your implementation
+     *
+     * @param bool|null
+     */
+    protected $secure = NULL;
+
+    /**
+     * will hold a unique ID to identify the session (it could be handy to have)
+     *
+     * @var string
+     */
     private $uniqueId;
+
+    /**
+     * if true the IP detection will consider $ipOctetsToCheck
+     *
+     * @var boolean
+     */
     public $proxyAwareIpDetection = true;
+
+    /**
+     * the number of octates to consider when identifying the IP
+     *
+     * @var integer
+     */
     public $ipOctetsToCheck = 2;
+
+    /**
+     * if true, will check against $allowedUrls
+     *
+     * @var boolean
+     */
     public $useAuthorization = false;
+
+    /**
+     * array list containing the file names that are excluded in the authorization process
+     *
+     * @var array
+     */
     public $ignoreInAuthorization = [];
+
+    /**
+     * if true will override all authorization since it only make since in MPA applications,
+     * allowing you to implement your own way to authorize in a SPA app like using middlewares.
+     *
+     * @var boolean
+     */
     public $app_is_spa = true;
 
     /**
-     * Extend this class and define a constructor, here you have a template:
+     * Extend this class and define a constructor, here you have a template for a MPA app:
      *
      * $sessionAdmin = new \MyNamespace\MyImplementationOfSessionAdmin(
      *     [
@@ -463,23 +548,17 @@ abstract class SessionAdmin{
         // Target file
         $url = '/index.php';
 
-        // Preserve original request URI
-        $originalUri = $_SERVER['REQUEST_URI'] ?? '';
-        if ($originalUri && $originalUri !== '/index.php') {
-            $url .= '?return_to=' . urlencode($originalUri);
-        }
-
         // Detect request type
         $requestedWith = $_SERVER['HTTP_X_REQUESTED_WITH'] ?? '';
         $accept = $_SERVER['HTTP_ACCEPT'] ?? '';
-        $isXhr = false;
+        $isXhrOrFetch = false;
 
         if (strtolower($requestedWith) === 'xmlhttprequest') {
-            $isXhr = true;
+            $isXhrOrFetch = true;
         } elseif (stripos($accept, 'application/json') !== false || stripos($accept, 'text/javascript') !== false) {
-            $isXhr = true;
+            $isXhrOrFetch = true;
         } elseif (!empty($_SERVER['HTTP_X_FETCH_REQUEST']) || !empty($_SERVER['HTTP_SEC_FETCH_MODE'])) {
-            $isXhr = true;
+            $isXhrOrFetch = true;
         }
 
         // Decide HTTP status code
@@ -498,7 +577,7 @@ abstract class SessionAdmin{
         }
 
         // XHR/fetch requests → return JSON + custom header
-        if ($isXhr) {
+        if ($isXhrOrFetch) {
             if (!headers_sent()) {
                 header('Content-Type: application/json; charset=utf-8', true, $status);
                 header("X-Redirect-URL: {$url}");
