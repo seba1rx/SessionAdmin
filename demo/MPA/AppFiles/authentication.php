@@ -1,6 +1,6 @@
 <?php
 
-include('required.php');
+include(__DIR__ . '/required.php');
 
 /**
  * this scripts simulates an authentication, you should implement your own validation

@@ -1,4 +1,4 @@
-<?php require('required.php'); ?>
+<?php require('AppFiles/required.php'); ?>
 <!DOCTYPE html>
 <html>
 <head>

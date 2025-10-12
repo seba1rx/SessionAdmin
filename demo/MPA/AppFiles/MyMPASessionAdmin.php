@@ -1,11 +1,11 @@
 <?php
 
-namespace MPA;
+namespace MPA\AppFiles;
 
-include "vendor/autoload.php";
-include "../../vendor/autoload.php";
+include __DIR__ . "/../vendor/autoload.php";
+include __DIR__ . "/../../../vendor/autoload.php";
 
-use Seba1rx\SessionAdmin;
+use Seba1rx\SessionAdmin\SessionAdmin;
 
 /**
  * The SessionAdmin Class is an abstract class, but has no abstract methods,

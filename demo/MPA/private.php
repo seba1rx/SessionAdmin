@@ -1,4 +1,4 @@
-<?php require('required.php'); ?>
+<?php require('AppFiles/required.php'); ?>
 <!DOCTYPE html>
 <html>
 <head>
@@ -14,7 +14,7 @@
                 <p><?php echo ($_SESSION['urlIsAllowedToLoad']? '': 'You have disabled the validation in required.php'); ?></p>
 
                 <?php if($_SESSION['isUser']){ ?>
-                <img src="<?php echo $_SESSION['data']['avatar']; ?>" alt="avatar" style="max-width: 100px;" class="img-thumbnail mb-1 bg-info">
+                <img src="images/<?php echo $_SESSION['data']['avatar']; ?>" alt="avatar" style="max-width: 100px;" class="img-thumbnail mb-1 bg-info">
                 <?php } ?>
 
             </div>

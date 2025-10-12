@@ -1,8 +1,8 @@
 <?php
 
-require('vendor/autoload.php');
+require(__DIR__ . '/../vendor/autoload.php');
 
-use MPA\MyMPASessionAdmin;
+use MPA\AppFiles\MyMPASessionAdmin;
 
 /**
  * you can define a configuration array if you want, or you can just use
@@ -26,7 +26,7 @@ $conf["keys"] = [ // set other starting data that will be globally accessible di
 $sessionAdmin = new MyMPASessionAdmin($conf);
 $sessionAdmin->app_is_spa = false;
 $sessionAdmin->useAuthorization = true;
-$sessionAdmin->ignoreInAuthorization = ["Authentication.php"];
+$sessionAdmin->ignoreInAuthorization = ["authentication.php"];
 $sessionAdmin->ipOctetsToCheck = 2;
 $sessionAdmin->proxyAwareIpDetection = true;
 $sessionAdmin->activateSession();

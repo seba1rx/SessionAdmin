@@ -1,11 +1,9 @@
-<?php require('required.php'); ?>
+<?php require('AppFiles/required.php'); ?>
 <!DOCTYPE html>
 <html>
-
 <head>
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
 </head>
-
 <body>
     <div class="wrapper p-5">
         <div class="row mt-5 justify-content-center">
@@ -20,7 +18,7 @@
             </div>
         </div>
         <div class="row justify-content-center no-gutters">
-            <div class="col-lg-8 col-sm-6">
+            <div class="col-lg-8 col-sm-10">
                 <?php if(!$_SESSION['isUser']){ ?>
                 <div class="col-12">
                     <form id="loginForm" name="loginForm" onsubmit="return tryToAuthenticate(event)" class="form-inline mt-2">
@@ -64,13 +62,15 @@
             event.preventDefault();
             $.ajax({
                 type: "POST",
-                url: "Authentication.php",
+                url: "AppFiles/authentication.php",
                 data: $('#loginForm').serializeArray(),
                 dataType: "json",
                 success: function(response) {
                     if(response.ok){
                         alert(response.msg);
                         location.reload();
+                    }else if(response.redirect){
+                        window.location.href = response.redirect;
                     }else{
                         alert(response.msg);
                     }
