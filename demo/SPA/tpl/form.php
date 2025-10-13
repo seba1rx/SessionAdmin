@@ -1,4 +1,4 @@
-<div class="col-12">
+<div class="col-8 col-sm-10">
     <form id="loginForm" name="loginForm" class="form-inline mt-2">
         <input type="email" title="Enter email" class="form-control mr-1" name="useremail" placeholder="email@example.com" value="demo@mail.com">
         <input type="password" title="Enter password" class="form-control mr-1" name="userpassword" value="your_password_here">

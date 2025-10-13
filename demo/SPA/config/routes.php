@@ -8,6 +8,7 @@ return [
     "POST" => [
         "/hello" => [App\Controller::class, "hello"],
         "/reloadSessionData" => [App\Controller::class, "reloadSessionData"],
+        "/addVarToSession" => [App\Controller::class, "addVarToSession"],
         "/showLogin" => [App\Controller::class, "showLogin"],
         "/authenticate" => [App\Authentication::class, "authenticate"],
         "/demoData" => [App\Controller::class, "demoData"],

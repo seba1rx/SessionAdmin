@@ -13,7 +13,7 @@
                 <h3>Check the routes in the left and the session content in the right</h3>
 
                 <?php if($_SESSION['isUser'] ?? false){ ?>
-                <img src="<?php echo $_SESSION['data']['avatar']; ?>" alt="avatar" style="max-width: 100px;" class="img-thumbnail mb-1 bg-info">
+                <img src="assets/<?php echo $_SESSION['data']['avatar']; ?>" alt="avatar" style="max-width: 100px;" class="img-thumbnail mb-1 bg-info">
                 <?php } ?>
 
             </div>
@@ -28,6 +28,7 @@
                             <li style="cursor: pointer;"><span onclick="App.request.post({url:'/hello'})">Hello</span></li>
                             <li style="cursor: pointer;"><span onclick="App.request.post({url:'/demoData'})">Demo data</span></li>
                             <li style="cursor: pointer;"><span onclick="App.request.post({url:'/showLogin'})">Show login form</span></li>
+                            <li id="addvar" class="d-none" style="cursor: pointer;"><span onclick="App.addVar()">Show form to add var to session</span></li>
                         </dd>
 
                         <br>
@@ -51,40 +52,6 @@
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>
-        /**
-         * gets the values from a form
-         *
-         * @param {string} formId - ID del formulario
-         * @returns {object} - Objeto con pares { id: valor }
-         */
-        function getFormDataById(formId) {
-            const form = document.getElementById(formId);
-            if (!form) {
-                console.error(`Form id "${formId}" not found`);
-                return {};
-            }
-
-            const data = {};
-
-            // select all items with attribute "name" in the form
-            form.querySelectorAll('input, select, textarea').forEach(el => {
-                if (!el.name) return; // ignore those without name
-
-                if (el.type === 'checkbox') {
-                    data[el.name] = el.checked;
-                } else if (el.type === 'radio') {
-                    // just keep selected
-                    if (el.checked) data[el.name] = el.value;
-                } else {
-                    data[el.name] = el.value;
-                }
-            });
-
-            console.log(data);
-            return data;
-        }
-
-
         const App = {
             /**
              * Get all the form values in an indexed array
@@ -92,17 +59,42 @@
              * usage: var data = App.getData('form_id');
              *
              * @param {String} form_id
-             * @returns
+             * @returns {object} - Objeto con pares { id: valor }
              */
             getData: (form_id) => {
-                return getFormDataById(form_id);
+                const form = document.getElementById(form_id);
+                if (!form) {
+                    console.error(`Form id "${form_id}" not found`);
+                    return {};
+                }
+
+                const data = {};
+
+                // select all items with attribute "name" in the form
+                form.querySelectorAll('input, select, textarea').forEach(el => {
+                    if (!el.name) return; // ignore those without name
+
+                    if (el.type === 'checkbox') {
+                        data[el.name] = el.checked;
+                    } else if (el.type === 'radio') {
+                        // just keep selected
+                        if (el.checked) data[el.name] = el.value;
+                    } else {
+                        data[el.name] = el.value;
+                    }
+                });
+
+                // console.log(data);
+                return data;
             },
+
             request: {
                 get: (args)=>{App.send('GET',args);},
                 post: (args)=>{App.send('POST',args);},
                 put: (args)=>{App.send('PUT',args);},
                 delete: (args)=>{App.send('DELETE',args);}
             },
+
             /**
              * Sends the request
              * @param {string} method
@@ -140,7 +132,7 @@
 
                     App.process(result);
                 } catch (error) {
-                    console.error("Error on request:", error);
+                    console.log("Error on request:", error.message);
                     App.process({ error: error.message });
                 }
             },
@@ -158,14 +150,14 @@
                     swal.fire({icon: "error", text: response.error});
                 }
                 if(response.auth){
-                    if(response.ok){
+                    if(response.auth.ok){
                         swal.fire({
                             icon: "success",
                             title: "Logged in!",
                             html: response.auth.msg,
                             confirmButtonText: "Hooray!",
                         }).then((result) => {
-                            App.request.post({url:'/reloadSessionData'});
+                            App.request.get({url:'/'}); // reloads te main view
                         });
 
                     }else{
@@ -189,7 +181,15 @@
                     });
                 }
                 if(response.dialog){
-                    swal.fire({html: response.dialog});
+                    let title = null;
+                    let html = null;
+                    if(response.dialog.title) title = response.dialog.title;
+                    if(response.dialog.html) html = response.dialog.html;
+
+                    swal.fire({title: title, html: html});
+                }
+                if(response.eval){
+                    eval(response.eval);
                 }
             },
             redirect: (url) => {
@@ -197,6 +197,25 @@
                     window.location.replace(url);
                 }catch(e){
                     swal.fire({icon:"error", title: e.message, html: e.stack});
+                }
+            },
+            addVar: async () => {
+                const { value: formValues } = await Swal.fire({
+                    title: "Multiple inputs",
+                    html: `
+                        var name: <input id="varname" class="swal2-input">
+                        var value: <input id="varvalue" class="swal2-input">
+                    `,
+                    focusConfirm: false,
+                    preConfirm: () => {
+                        return {
+                            varname: document.getElementById("varname").value,
+                            value: document.getElementById("varvalue").value
+                        };
+                    }
+                });
+                if (formValues) {
+                    App.request.post({url:'/addVarToSession', data: formValues});
                 }
             },
         };

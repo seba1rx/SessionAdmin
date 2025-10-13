@@ -2,7 +2,7 @@
 
 namespace App;
 
-use Seba1rx\SessionAdmin;
+use Seba1rx\SessionAdmin\SessionAdmin;
 
 /**
  * The SessionAdmin Class is an abstract class, but has no abstract methods,

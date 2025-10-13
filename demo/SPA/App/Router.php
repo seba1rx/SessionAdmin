@@ -35,6 +35,6 @@ class Router
 
         // If not matched
         http_response_code(404);
-        echo "404 Not Found: {$method} {$uri}" . PHP_EOL;
+        echo json_encode(["error" => "404 Not Found: {$method} {$uri}"]);
     }
 }

@@ -54,6 +54,7 @@ class Authentication
 
             $validation->auth->ok = true;
             $validation->auth->msg = 'Wellcome '.$_SESSION['data']['name'];
+            $validation->eval = "document.getElementById('addvar').classList.remove('d-none')";
 
         }else{
             $validation->auth->msg = 'Complete the form fields!';

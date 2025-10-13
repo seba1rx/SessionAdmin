@@ -4,7 +4,13 @@ require __DIR__."/vendor/autoload.php";
 require __DIR__."/../../vendor/autoload.php";
 
 set_exception_handler(function (Throwable $e) {
-    $msg = "File: " . $e->getFile() . " Line: " . $e->getLine() . " ". $e->getMessage() . "\n";
+    $pathToFile = $e->getFile();
+    $file = $pathToFile;
+    $pos = strrpos($pathToFile, "/");
+    if ($pos !== false) {
+        $file = substr($pathToFile, $pos + 1);
+    }
+    $msg = "## " . $file . " Line: " . $e->getLine() . " ". $e->getMessage() . "\n";
     error_log($msg);
 });
 
@@ -18,7 +24,8 @@ $routes = require __DIR__."/config/routes.php";
 include __DIR__."/config/session.php";
 
 /**
- * Globally scoped function
+ * Handy fn to get the tpl path
+ * * Globally scoped function
  * @return string
  */
 function tpl_dir($tpl): string
@@ -27,7 +34,21 @@ function tpl_dir($tpl): string
 }
 
 /**
- * Globally scoped function
+ * Handy fn to wrap content in a left aligned div
+ * * Globally scoped function
+ * @param string $content
+ * @return string
+ */
+function wrapInLeftAlignedDiv(string $content): string
+{
+    $wrapped = '<div style="text-align: left;">'.$content.'</div>';
+    return $wrapped;
+}
+
+/**
+ * Handy fn to get the sessionAdmin instance
+ * * Globally scoped function
+ * @return MySPASessionAdmin
  */
 function sessionAdmin(): MySPASessionAdmin
 {

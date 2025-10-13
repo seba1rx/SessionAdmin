@@ -3,6 +3,7 @@
 namespace App;
 
 use App\TemplateEngine;
+use App\Request;
 
 class Controller
 {
@@ -21,7 +22,11 @@ class Controller
 
     public function hello(): object
     {
-        $this->response->dialog = "Hello from backend!";
+        $dialog = new \stdClass;
+        $dialog->title = "hello";
+        $dialog->html = "Hello from backend!";
+
+        $this->response->dialog = $dialog;
         return $this->response;
     }
 
@@ -32,7 +37,12 @@ class Controller
         $data->bar = "bar";
         $data->baz = "baz";
 
-        $this->response->dialog = json_encode($data);
+        $dialog = new \stdClass;
+        $dialog->title = "demoData";
+        $html = nl2br(json_encode($data, JSON_PRETTY_PRINT));
+        $dialog->html = wrapInLeftAlignedDiv($html);
+
+        $this->response->dialog = $dialog;
 
         return $this->response;
     }
@@ -48,6 +58,11 @@ class Controller
         return $this->response;
     }
 
+    /**
+     * reloads the div showing the session data
+     *
+     * @return object
+     */
     public function reloadSessionData(): object
     {
         $content = json_encode($_SESSION ?? [], JSON_PRETTY_PRINT);
@@ -64,6 +79,13 @@ class Controller
     {
         sessionAdmin()->terminate();
         return $this->response;
+    }
+
+    public function addVarToSession(Request $request): object
+    {
+        $payload = $request->getPayload();
+        $_SESSION[$payload['varname']] = $payload['value'];
+        return $this->reloadSessionData();
     }
 
 }
