@@ -2,7 +2,9 @@
 
 Install with `composer require seba1rx/sessionadmin`
 
-The SessionAdmin class has 2 public methods: `activateSession()` and `createUserSession()`.
+The SessionAdmin class has 3 public methods: `activateSession()`,  `createUserSession()` and `terminate()`.
+
+The SessionAdmin class is fully documented so you can check each method or property in order to get to understand it better.
 
 ### The SessionAdmin class is defined as an abstract class but has no abstract methods, it is intended to be extended by implementing a custom constructor.
 

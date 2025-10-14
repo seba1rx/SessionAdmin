@@ -19,6 +19,8 @@ class Router
         $method = $_SERVER['REQUEST_METHOD'];
         $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 
+        error_log("## {$method} {$uri}");
+
         // Match route
         if (isset($this->routes[$method][$uri])) {
             [$class, $action] = $this->routes[$method][$uri];
@@ -28,13 +30,13 @@ class Router
                 return $controller->$action(new Request);
             } else {
                 http_response_code(500);
-                echo "Controller or method not found: {$class}::{$action}";
+                return ["error" => "Controller or method not found: {$class}::{$action}"];
                 exit;
             }
         }
 
         // If not matched
-        http_response_code(404);
-        echo json_encode(["error" => "404 Not Found: {$method} {$uri}"]);
+        // http_response_code(404);
+        return ["error" => "404 Not Found: {$method} {$uri}"];
     }
 }

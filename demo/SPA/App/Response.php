@@ -12,7 +12,9 @@ class Response
         if ($request_type == "xhr" || $request_type == "fetch") {
             // JSON response
             header('Content-Type: application/json; charset=utf-8');
+            error_log("## " . json_encode($data));
             echo json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            exit;
         } else {
             // HTML response
             header('Content-Type: text/html; charset=utf-8');

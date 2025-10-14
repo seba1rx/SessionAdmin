@@ -65,19 +65,25 @@ class Controller
      */
     public function reloadSessionData(): object
     {
-        $content = json_encode($_SESSION ?? [], JSON_PRETTY_PRINT);
+        // the validation to check if the session is user or guest can be placed in a middleware
+        if($_SESSION['isUser']){
+            $content = json_encode($_SESSION ?? [], JSON_PRETTY_PRINT);
 
-        $html = new \stdClass;
-        $html->id = "session_data";
-        $html->content = $content;
+            $html = new \stdClass;
+            $html->id = "session_data";
+            $html->content = $content;
 
-        $this->response->html = $html;
+            $this->response->html = $html;
+        }else{
+            $this->response->eval = "window.location.reload()";
+        }
         return $this->response;
     }
 
     public function logout(): object
     {
         sessionAdmin()->terminate();
+        $this->response->eval = "window.location.reload()";
         return $this->response;
     }
 

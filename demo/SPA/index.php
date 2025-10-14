@@ -18,6 +18,7 @@ use App\Router;
 use App\Response;
 use App\MySPASessionAdmin;
 
+// get the routes
 $routes = require __DIR__."/config/routes.php";
 
 // include the session script
@@ -56,7 +57,9 @@ function sessionAdmin(): MySPASessionAdmin
     return $spa_sessionAdmin;
 }
 
+// run the app
 $router = new Router($routes);
 $response = $router->routeToAction();
 
+// send back the response
 Response::send($response);

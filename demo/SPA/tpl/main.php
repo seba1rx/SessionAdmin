@@ -22,13 +22,15 @@
             <div class="col-lg-8 col-sm-10">
                 <div class="row mt-5">
                     <div class="col-6">
-                        <p>Click on each route to check this app working</p>
+                        <p>Click on each route to check this app</p>
                         <dd>
                             <li style="cursor: pointer;"><span onclick="App.redirect('/')">Start</span></li>
                             <li style="cursor: pointer;"><span onclick="App.request.post({url:'/hello'})">Hello</span></li>
                             <li style="cursor: pointer;"><span onclick="App.request.post({url:'/demoData'})">Demo data</span></li>
                             <li style="cursor: pointer;"><span onclick="App.request.post({url:'/showLogin'})">Show login form</span></li>
-                            <li id="addvar" class="d-none" style="cursor: pointer;"><span onclick="App.addVar()">Show form to add var to session</span></li>
+                            <?php if($_SESSION['isUser'] ?? false){ ?>
+                            <li style="cursor: pointer;"><span onclick="App.addVar()" class="font-weight-bold">Show form to add var to session</span></li>
+                            <?php } ?>
                         </dd>
 
                         <br>
@@ -157,7 +159,9 @@
                             html: response.auth.msg,
                             confirmButtonText: "Hooray!",
                         }).then((result) => {
-                            App.request.get({url:'/'}); // reloads te main view
+                            if (result.isConfirmed) {
+                                window.location.reload();
+                            }
                         });
 
                     }else{
@@ -204,6 +208,7 @@
                     title: "Multiple inputs",
                     html: `
                         var name: <input id="varname" class="swal2-input">
+                        <br>
                         var value: <input id="varvalue" class="swal2-input">
                     `,
                     focusConfirm: false,

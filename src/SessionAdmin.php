@@ -531,8 +531,11 @@ abstract class SessionAdmin{
         $_SESSION = [];
         $this->destroySession();
 
-        /** go to safe page */
-        $this->redirectToIndex();
+        // only for MPA
+        if(!$this->app_is_spa){
+            /** go to safe page */
+            $this->redirectToIndex();
+        }
     }
 
     /**
