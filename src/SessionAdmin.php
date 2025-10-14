@@ -2,6 +2,8 @@
 
 namespace Seba1rx\SessionAdmin;
 
+use Seba1rx\SessionAdmin\SessionAdminServer;
+
 /**
  * Extend this class to customize it by creating your own constructor
  *
@@ -112,6 +114,13 @@ abstract class SessionAdmin{
     public $app_is_spa = true;
 
     /**
+     * will hold the instance of the SessionAdminServer class
+     * @var SessionAdminServer
+     */
+    public $sessionAdminServer;
+
+
+    /**
      * Extend this class and define a constructor, here you have a template for a MPA app:
      *
      * $sessionAdmin = new \MyNamespace\MyImplementationOfSessionAdmin(
@@ -137,7 +146,13 @@ abstract class SessionAdmin{
     {
         session_name($this->sessionName);
         $this->setSessionTime();
-        session_start();
+
+        // session_start();
+
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+
         $this->setSessionTimeStamps();
 
         if(isset($_SESSION['uniqueId'])){
@@ -152,6 +167,9 @@ abstract class SessionAdmin{
         if($this->useAuthorization && !$this->app_is_spa){
             $this->checkIfUrlIsAllowed();
         }
+
+        // set the session admin server
+        $this->sessionAdminServer = new sessionAdminServer();
 
         foreach($this->keys as $key => $item){
             if(!isset($_SESSION[$key])){

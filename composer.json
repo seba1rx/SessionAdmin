@@ -12,11 +12,15 @@
     "autoload": {
         "psr-4": {
             "Seba1rx\\SessionAdmin\\": "src/"
-        }
+        },
+        "files": [
+            "src/bootstrap.php"
+        ]
     },
     "scripts": {
         "post-install-cmd": [
-            "Seba1rx\\ComposerScripts::publishAssets"
+            "Seba1rx\\ComposerScripts::publishAssets",
+            "php -r \"copy(__DIR__.'/script/seba1rx_sessionadmin.js', getcwd().'/seba1rx_sessionadmin.js');\""
         ],
         "post-update-cmd": [
             "Seba1rx\\ComposerScripts::publishAssets"
@@ -30,5 +34,7 @@
             "scripts/seba1rx_sessionAdmin.js": "seba1rx_sessionAdmin.js"
         }
     },
-    "require": {}
+    "require": {
+        "php": ">=7.4"
+    }
 }
