@@ -117,7 +117,7 @@ abstract class SessionAdmin{
      * will hold the instance of the SessionAdminServer class
      * @var SessionAdminServer
      */
-    public $sessionAdminServer;
+    public $server;
 
 
     /**
@@ -169,7 +169,7 @@ abstract class SessionAdmin{
         }
 
         // set the session admin server
-        $this->sessionAdminServer = new sessionAdminServer();
+        $this->server = new sessionAdminServer();
 
         foreach($this->keys as $key => $item){
             if(!isset($_SESSION[$key])){

@@ -71,8 +71,9 @@ if (!defined('__SEBA1RX_SESSIONADMIN_BOOTSTRAPPED__')) {
             exit;
         }
 
-        $admin = new SessionAdminServer();
-        $tabs = $admin->debug();
+        // $admin = new SessionAdminServer();
+        // $tabs = $admin->debug();
+        $tabs = sessionAdmin()->server->debug();
 
         // --- HTML MODE --------------------------------------------------------
         if (defined('SESSIONADMIN_DEBUG_UI') && SESSIONADMIN_DEBUG_UI === true) {

@@ -21,6 +21,7 @@ class SessionAdminServer
      */
     protected function getTabId(): ?string
     {
+        error_log("## cookies: " . json_encode($_COOKIE));
         return $_COOKIE['SESSIONADMIN_TABID'] ?? null;
     }
 
@@ -30,8 +31,10 @@ class SessionAdminServer
     public function set(string $key, $value): void
     {
         $tabId = $this->getTabId();
+        error_log("## tabId pre");
         if (!$tabId) return;
 
+        error_log("## tabId {$tabId} setting {$key} => {$value}");
         $_SESSION[$this->sessionKey][$tabId]['_data'][$key] = $value;
         $_SESSION[$this->sessionKey][$tabId]['_active'] = true;
         $_SESSION[$this->sessionKey][$tabId]['_last_active'] = time();

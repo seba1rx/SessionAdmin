@@ -23,9 +23,10 @@ The SessionAdmin class is fully documented so you can check each method or prope
 
 In order to get an implementation idea go check the demos.
 
-## There are 2 demos
+## There are 3 demos
 * MPA (Multi Page Application)
 * SPA (Single Page Application)
+* TABS (SPA + tab uuid)
 
 ---
 ## 🚀 Features
