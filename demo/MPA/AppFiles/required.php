@@ -24,7 +24,8 @@ $conf["keys"] = [ // set other starting data that will be globally accessible di
 ];
 
 $sessionAdmin = new MyMPASessionAdmin($conf);
-$sessionAdmin->app_is_spa = false;
+$sessionAdmin->useTabIndexation = false;
+$sessionAdmin->app_isSpa = false;
 $sessionAdmin->useAuthorization = true;
 $sessionAdmin->ignoreInAuthorization = ["authentication.php"];
 $sessionAdmin->ipOctetsToCheck = 2;

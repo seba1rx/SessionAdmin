@@ -111,13 +111,20 @@ abstract class SessionAdmin{
      *
      * @var boolean
      */
-    public $app_is_spa = true;
+    public $app_isSpa = true;
 
     /**
      * will hold the instance of the SessionAdminServer class
      * @var SessionAdminServer
      */
     public $server;
+
+    /**
+     * If true will use SessionAdminServer class to manage the set and get of session vars by indexing under tab Uuid
+     *
+     * @var boolean
+     */
+    public $useTabIndexation = true;
 
 
     /**
@@ -164,18 +171,32 @@ abstract class SessionAdmin{
         }
 
         // only check url when app is MPA
-        if($this->useAuthorization && !$this->app_is_spa){
+        if($this->useAuthorization && !$this->app_isSpa){
             $this->checkIfUrlIsAllowed();
         }
 
         // set the session admin server
-        $this->server = new sessionAdminServer();
+        if($this->useTabIndexation){
+            $this->setSessionAdminServer();
+        }else{
+            unset($this->server);
+        }
 
         foreach($this->keys as $key => $item){
             if(!isset($_SESSION[$key])){
                 $_SESSION[$key] = $item;
             }
         }
+    }
+
+    /**
+     * Sets the SessionAdminServer instance
+     *
+     * @return void
+     */
+    public function setSessionAdminServer(): void
+    {
+        $this->server = new sessionAdminServer();
     }
 
     /**
@@ -550,7 +571,7 @@ abstract class SessionAdmin{
         $this->destroySession();
 
         // only for MPA
-        if(!$this->app_is_spa){
+        if(!$this->app_isSpa){
             /** go to safe page */
             $this->redirectToIndex();
         }

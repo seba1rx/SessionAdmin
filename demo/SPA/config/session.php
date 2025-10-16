@@ -10,6 +10,7 @@ $conf["keys"] = [ // set other starting data that will be globally accessible di
 ];
 
 $spa_sessionAdmin = new MySPASessionAdmin($conf);
+$spa_sessionAdmin->useTabIndexation = false;
 $spa_sessionAdmin->useAuthorization = true;
 $spa_sessionAdmin->ipOctetsToCheck = 2;
 $spa_sessionAdmin->proxyAwareIpDetection = true;

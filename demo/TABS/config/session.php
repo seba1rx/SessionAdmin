@@ -10,6 +10,7 @@ $conf["keys"] = [ // set other starting data that will be globally accessible di
 ];
 
 $tab_sessionAdmin = new MyTABSessionAdmin($conf);
+$tab_sessionAdmin->useTabIndexation = true;
 $tab_sessionAdmin->useAuthorization = true;
 $tab_sessionAdmin->ipOctetsToCheck = 2;
 $tab_sessionAdmin->proxyAwareIpDetection = true;
