@@ -207,7 +207,7 @@ abstract class SessionAdmin{
      */
     public function createUserSession(mixed $id_user): void
     {
-        $this->uniqueId = base_convert(microtime(false), 10, 36);
+        $this->uniqueId = bin2hex(random_bytes(6));
 
         $_SESSION['isUser'] = TRUE;
         $_SESSION['msg'] = 'you are a user';
@@ -638,6 +638,94 @@ abstract class SessionAdmin{
         echo "Redirecting to <a href=\"{$url}\">index.php</a>.";
         echo '</body></html>';
         exit;
+    }
+
+    /**
+     * Wrapper for PHP's native setcookie() function.
+     *
+     * This method exists to make cookie management testable in unit tests
+     * without invoking actual HTTP headers. It mirrors the native PHP
+     * setcookie() signature and behavior as closely as possible.
+     *
+     * @param string $name     The name of the cookie.
+     * @param string $value    The value of the cookie. An empty string will delete the cookie.
+     * @param int|string|array $expiresOrOptions
+     *        - If an int, it is interpreted as a Unix timestamp for expiration.
+     *        - If a string, it will be parsed as a date/time for expiration.
+     *        - If an array, it must match the PHP 7.3+ options format, e.g.:
+     *          [
+     *              'expires'  => time() + 3600,
+     *              'path'     => '/',
+     *              'domain'   => '',
+     *              'secure'   => true,
+     *              'httponly' => true,
+     *              'samesite' => 'Lax'
+     *          ]
+     * @param string $path     Optional. The path on the server in which the cookie will be available.
+     * @param string $domain   Optional. The (sub)domain the cookie is available to.
+     * @param bool   $secure   Optional. Indicates that the cookie should only be transmitted over HTTPS.
+     * @param bool   $httponly Optional. When true, the cookie will be made accessible only through the HTTP protocol.
+     *
+     * @return bool Returns true on success or false on failure, just like native setcookie().
+     *
+     * @see https://www.php.net/manual/en/function.setcookie.php
+     */
+    protected function setCookie(
+        string $name,
+        string $value = "",
+        int|string|array $expiresOrOptions = 0,
+        string $path = "",
+        string $domain = "",
+        bool $secure = false,
+        bool $httponly = false
+    ): bool {
+        // Allow unit test override: if a mock method exists, use it.
+        if (method_exists($this, 'mockSetCookie')) {
+            return $this->mockSetCookie(
+                $name,
+                $value,
+                $expiresOrOptions,
+                $path,
+                $domain,
+                $secure,
+                $httponly
+            );
+        }
+
+        return setcookie(
+            $name,
+            $value,
+            $expiresOrOptions,
+            $path,
+            $domain,
+            $secure,
+            $httponly
+        );
+    }
+
+    /**
+     * Wrapper for accessing cookie values from the $_COOKIE superglobal.
+     *
+     * This method exists to make cookie reads testable in unit tests,
+     * providing a single point of access to cookie data. During testing,
+     * you can override or mock this method to simulate cookie states
+     * without modifying global variables.
+     *
+     * @param string $name     The name of the cookie to retrieve.
+     * @param mixed  $default  Optional. The default value to return if the cookie is not set.
+     *
+     * @return mixed Returns the cookie value if it exists, otherwise the default value.
+     *
+     * @see https://www.php.net/manual/en/reserved.variables.cookies.php
+     */
+    protected function getCookie(string $name, mixed $default = null): mixed
+    {
+        // Allow unit test override
+        if (method_exists($this, 'mockGetCookie')) {
+            return $this->mockGetCookie($name, $default);
+        }
+
+        return $_COOKIE[$name] ?? $default;
     }
 }
 

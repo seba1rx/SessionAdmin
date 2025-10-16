@@ -1,4 +1,20 @@
-    vendor/bin/phpunit --testdox tests/SessionAdminTest.php
+Test each class:
+```
+vendor/bin/phpunit --testdox tests/SessionAdminServerTest.php --display-all-issues
+
+vendor/bin/phpunit --testdox tests/SessionAdminTest.php --display-all-issues
+```
+
+Test both classes in specific order
+```
+vendor/bin/phpunit --testdox tests/SessionAdminServerTest.php tests/SessionAdminTest.php --display-all-issues
+```
+
+if you want to filter a specific test method:
+```
+vendor/bin/phpunit --testdox tests/SessionAdminTest.php --filter testMethodName
+```
+
 
 
 expected output:
