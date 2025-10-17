@@ -20,23 +20,30 @@ vendor/bin/phpunit --testdox tests/SessionAdminTest.php --filter testMethodName
 expected output:
 
 ```
-Session Lifecycle
+Session Admin (Seba1rx\SessionAdmin\SessionAdmin)
  ✔ Activate session creates guest session
  ✔ Create user session sets expected session data
-Security & IP
  ✔ Request is hijacking attempt returns false when session fresh
  ✔ Get ip prefix extracts correct prefix
-Utility
- ✔ Get substr after last returns correct segment
+ ✔ Get sub str after last returns correct segment
  ✔ Strrevpos finds reverse position
-Cookie Handling
  ✔ Set cookie stores values with expected attributes
  ✔ Get cookie value returns existing cookie
  ✔ Get cookie value returns null when missing
- ✔ Delete cookie removes cookie correctly
-Configuration Integrity
  ✔ Constructor applies configuration array
  ✔ Activate session loads configured keys
  ✔ Activate session with authorization enabled
  ✔ Configuration defaults when no values provided
+
+Session Admin Server
+ ✔ Constructor initializes session key
+ ✔ Set and get data for tab
+ ✔ Set does nothing without tab id
+ ✔ Get returns default when missing
+ ✔ Destroy tab session removes data
+ ✔ Mark inactive tab
+ ✔ Debug returns expected structure
+ ✔ Get session key returns constant
+
+OK (21 tests, 59 assertions)
 ```
