@@ -2,7 +2,8 @@
 
 namespace Seba1rx\SessionAdmin;
 
-use Seba1rx\SessionAdmin\SessionAdminServer;
+use Seba1rx\SessionAdmin\TabManager;
+use Seba1rx\SessionAdmin\Exceptions\SessionAdminException;
 
 /**
  * Extend this class to customize it by creating your own constructor
@@ -114,13 +115,19 @@ abstract class SessionAdmin{
     public $app_isSpa = true;
 
     /**
-     * will hold the instance of the SessionAdminServer class
-     * @var SessionAdminServer
+     * Handy property to prevent some actions while unit testing
+     * @var boolean
      */
-    public $server;
+    private $isRunningTests = false;
 
     /**
-     * If true will use SessionAdminServer class to manage the set and get of session vars by indexing under tab Uuid
+     * will hold the instance of the TabManager class
+     * @var TabManager
+     */
+    public $tabManager;
+
+    /**
+     * If true will use TabManager class to manage the set and get of session vars by indexing under tab Uuid
      *
      * @var boolean
      */
@@ -175,11 +182,11 @@ abstract class SessionAdmin{
             $this->checkIfUrlIsAllowed();
         }
 
-        // set the session admin server
+        // set the session admin tab manager
         if($this->useTabIndexation){
-            $this->setSessionAdminServer();
+            $this->setTabManager();
         }else{
-            unset($this->server);
+            unset($this->tabManager);
         }
 
         foreach($this->keys as $key => $item){
@@ -190,13 +197,13 @@ abstract class SessionAdmin{
     }
 
     /**
-     * Sets the SessionAdminServer instance
+     * Sets the TabManager instance
      *
      * @return void
      */
-    public function setSessionAdminServer(): void
+    public function setTabManager(): void
     {
-        $this->server = new sessionAdminServer();
+        $this->tabManager = new TabManager();
     }
 
     /**
@@ -571,7 +578,7 @@ abstract class SessionAdmin{
         $this->destroySession();
 
         // only for MPA
-        if(!$this->app_isSpa){
+        if(!$this->app_isSpa && !$this->isRunningTests){
             /** go to safe page */
             $this->redirectToIndex();
         }
@@ -726,6 +733,16 @@ abstract class SessionAdmin{
         }
 
         return $_COOKIE[$name] ?? $default;
+    }
+
+    /**
+     * called from unit tests
+     *
+     * @codeCoverageIgnore
+     */
+    private function setIsRunningTests(bool $isRunningTest = true): void
+    {
+        $this->isRunningTests = $isRunningTest;
     }
 }
 

@@ -1,23 +1,18 @@
+# Tests:
+
 Test each class:
 ```
-vendor/bin/phpunit --testdox tests/SessionAdminServerTest.php --display-all-issues
+vendor/bin/phpunit --testdox tests/TabManagerTest.php --display-all-issues
 
 vendor/bin/phpunit --testdox tests/SessionAdminTest.php --display-all-issues
 ```
 
 Test both classes in specific order
 ```
-vendor/bin/phpunit --testdox tests/SessionAdminServerTest.php tests/SessionAdminTest.php --display-all-issues
+vendor/bin/phpunit --testdox tests/TabManagerTest.php tests/SessionAdminTest.php --display-all-issues
 ```
 
-if you want to filter a specific test method:
-```
-vendor/bin/phpunit --testdox tests/SessionAdminTest.php --filter testMethodName
-```
-
-
-
-expected output:
+Expected output:
 
 ```
 Session Admin (Seba1rx\SessionAdmin\SessionAdmin)
@@ -35,7 +30,7 @@ Session Admin (Seba1rx\SessionAdmin\SessionAdmin)
  ✔ Activate session with authorization enabled
  ✔ Configuration defaults when no values provided
 
-Session Admin Server
+Tab Manager
  ✔ Constructor initializes session key
  ✔ Set and get data for tab
  ✔ Set does nothing without tab id
@@ -47,3 +42,8 @@ Session Admin Server
 
 OK (21 tests, 59 assertions)
 ```
+
+
+## test issues:
+
+you could get zero coverage in SessionAdmintest since the test uses Reflection to access private methods

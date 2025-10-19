@@ -93,8 +93,8 @@ class Controller
         // $_SESSION[$payload['varname']] = $payload['value'];
         // return $this->reloadSessionData();
 
-        // try using session admin server
-        sessionAdmin()->server->set($payload['varname'], $payload['value']);
+        // try using session admin tab manager instead:
+        sessionAdmin()->tabManager->set($payload['varname'], $payload['value']);
         return $this->reloadSessionData();
     }
 

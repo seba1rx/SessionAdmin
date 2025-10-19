@@ -1,6 +1,6 @@
 <?php
 /**
- * SessionAdminServer bootstrap
+ * TabManager bootstrap
  *
  * Registers internal endpoints:
  *  - POST /sessionadmin/tab-close
@@ -8,7 +8,7 @@
  *  - POST /sessionadmin/debug/delete-tab
  */
 
-use Seba1rx\SessionAdmin\SessionAdminServer;
+use Seba1rx\SessionAdmin\TabManager;
 
 if (!defined('__SEBA1RX_SESSIONADMIN_BOOTSTRAPPED__')) {
     define('__SEBA1RX_SESSIONADMIN_BOOTSTRAPPED__', true);
@@ -22,7 +22,7 @@ if (!defined('__SEBA1RX_SESSIONADMIN_BOOTSTRAPPED__')) {
         $tabId = $input['tab_id'] ?? null;
 
         if ($tabId) {
-            $admin = new SessionAdminServer();
+            $admin = new TabManager();
             $admin->markInactiveTab($tabId);
         }
 
@@ -49,8 +49,8 @@ if (!defined('__SEBA1RX_SESSIONADMIN_BOOTSTRAPPED__')) {
         }
 
         if ($tabId) {
-            $admin = new SessionAdminServer();
-            $admin->destroyTabSession($tabId);
+            $tabManager = new TabManager();
+            $tabManager->destroyTabSession($tabId);
         }
 
         header('Content-Type: application/json');
@@ -71,9 +71,7 @@ if (!defined('__SEBA1RX_SESSIONADMIN_BOOTSTRAPPED__')) {
             exit;
         }
 
-        // $admin = new SessionAdminServer();
-        // $tabs = $admin->debug();
-        $tabs = sessionAdmin()->server->debug();
+        $tabs = sessionAdmin()->tabManager->debug();
 
         // --- HTML MODE --------------------------------------------------------
         if (defined('SESSIONADMIN_DEBUG_UI') && SESSIONADMIN_DEBUG_UI === true) {
@@ -83,7 +81,7 @@ if (!defined('__SEBA1RX_SESSIONADMIN_BOOTSTRAPPED__')) {
             <html lang="en">
             <head>
                 <meta charset="utf-8">
-                <title>SessionAdminServer Debug</title>
+                <title>Tab Manager Debug</title>
                 <style>
                     body { font-family: system-ui, sans-serif; background: #f9f9f9; color: #333; padding: 2rem; }
                     h1 { font-size: 1.6rem; margin-bottom: 1rem; }
@@ -101,7 +99,7 @@ if (!defined('__SEBA1RX_SESSIONADMIN_BOOTSTRAPPED__')) {
                 </style>
             </head>
             <body>
-                <h1>SessionAdminServer Debug</h1>
+                <h1>Tab Manager Debug</h1>
                 <table>
                     <thead>
                         <tr>
@@ -117,8 +115,8 @@ if (!defined('__SEBA1RX_SESSIONADMIN_BOOTSTRAPPED__')) {
                     <?php foreach ($tabs as $tabId => $info): ?>
                         <tr data-tab="<?= htmlspecialchars($tabId) ?>">
                             <td><code><?= htmlspecialchars($tabId) ?></code></td>
-                            <td class="<?= $info['active'] ? 'active' : 'inactive' ?>">
-                                <?= $info['active'] ? 'Active' : 'Inactive' ?>
+                            <td class="<?= $info['is_active'] ? 'active' : 'inactive' ?>">
+                                <?= $info['is_active'] ? 'Active' : 'Inactive' ?>
                             </td>
                             <td class="timestamp"><?= htmlspecialchars($info['last_active']) ?></td>
                             <td class="keys"><?= htmlspecialchars(implode(', ', $info['keys'])) ?: '—' ?></td>
@@ -168,7 +166,7 @@ if (!defined('__SEBA1RX_SESSIONADMIN_BOOTSTRAPPED__')) {
         echo json_encode([
             'package' => 'seba1rx/sessionadmin',
             'version' => '1.0.0',
-            'session_key' => $admin->getSessionKey(),
+            'session_key' => $tabManager->getSessionKey(),
             'tabs' => $tabs,
         ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
         exit;
