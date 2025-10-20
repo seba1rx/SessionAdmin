@@ -17,6 +17,28 @@ class TabManager
     }
 
     /**
+     * Creates the tab id index in the tabs index in the $_SESSION array
+     *
+     * @param string $tabId
+     * @return void
+     */
+    public function indexNewTab(string $tabId): void
+    {
+        error_log("## tab manager adding new tab index: {$tabId}");
+        if (!isset($_SESSION[$this->sessionKey][$tabId])) {
+            $_SESSION[$this->sessionKey][$tabId] = [];
+            // $tabId = $this->getTabId();
+            // if (!$tabId) return;
+
+            $_SESSION[$this->sessionKey][$tabId]['data'] = [];
+            $_SESSION[$this->sessionKey][$tabId]['is_active'] = true;
+            $_SESSION[$this->sessionKey][$tabId]['last_active'] = time();
+
+            error_log("## tabs looks like this: " . json_encode($_SESSION[$this->sessionKey]));
+        }
+    }
+
+    /**
      * Get current tab ID from cookie
      */
     protected function getTabId(): ?string

@@ -160,21 +160,28 @@ abstract class SessionAdmin{
         session_name($this->sessionName);
         $this->setSessionTime();
 
-        // session_start();
-
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
+        session_start();
 
         $this->setSessionTimeStamps();
 
-        if(isset($_SESSION['uniqueId'])){
+        $this->uniqueId = bin2hex(random_bytes(6));
+        $_SESSION['uniqueId'] = $this->uniqueId;
+
+        if($this->currentStateIsUser()){
             # user
             $this->checkTime();
         }else{
             # guest
             $this->configureGuestSession();
         }
+
+        // if(isset($_SESSION['uniqueId'])){
+        //     # user
+        //     $this->checkTime();
+        // }else{
+        //     # guest
+        //     $this->configureGuestSession();
+        // }
 
         // only check url when app is MPA
         if($this->useAuthorization && !$this->app_isSpa){
@@ -196,6 +203,17 @@ abstract class SessionAdmin{
     }
 
     /**
+     * returns true if the Session has the key isUser and the value is true
+     * * empty() automatically returns false if the key doesn’t exist and the value is falsy
+     *
+     * @return bool
+     */
+    private function currentStateIsUser(): bool
+    {
+        return !empty($_SESSION['isUser']);
+    }
+
+    /**
      * Sets the TabManager instance
      *
      * @return void
@@ -213,11 +231,11 @@ abstract class SessionAdmin{
      */
     public function createUserSession(mixed $id_user): void
     {
-        $this->uniqueId = bin2hex(random_bytes(6));
+        // $this->uniqueId = bin2hex(random_bytes(6));
+        // $_SESSION['uniqueId'] = $this->uniqueId;
 
         $_SESSION['isUser'] = TRUE;
         $_SESSION['msg'] = 'you are a user';
-        $_SESSION['uniqueId'] = $this->uniqueId;
         $_SESSION['id_user'] = $id_user;
         $_SESSION['urlIsAllowedToLoad'] = FALSE;
 

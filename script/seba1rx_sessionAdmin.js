@@ -21,8 +21,8 @@ const SessionAdminClient = {
      * if you ever need to get the id just do:
      * * SessionAdminClient.tab.id;
      *
-     * In the backend you will be able to get this id on each request as:
-     * * $_COOKIE['session_tab_id'] (PHP example)
+     * In your php backend you will be able to get this id on each request as:
+     * * $_COOKIE['SESSIONADMIN_TABID']
      */
     tab: {
         /**
@@ -88,13 +88,23 @@ const SessionAdminClient = {
     },
     notifyTabClosed: () => {
         try {
-            const url = '/sessionadmin/tab-close'; // endpoint in your backend
+            const url = '/sessionadmin/tab-close'; // endpoint in your backend (automatically bootstrapped)
             const data = { tab_id: SessionAdminClient.tab.id };
             navigator.sendBeacon(url, JSON.stringify(data));
         } catch (e) {
             console.warn('[SessionAdminClient] Could not send tab close event:', e);
         }
     },
+    notifyNewTab: () => {
+        try {
+            const url = '/sessionadmin/new-tab'; // endpoint in your backend (automatically bootstrapped)
+            const data = { tab_id: SessionAdminClient.tab.id };
+            navigator.sendBeacon(url, JSON.stringify(data));
+        } catch (e) {
+            console.warn('[SessionAdminClient] Could not send tab close event:', e);
+        }
+    },
+
     /**
      * Initializes the session admin client:
      * - Assigns tab UUID
@@ -109,6 +119,9 @@ const SessionAdminClient = {
         if (currentCookie !== tabId) {
             SessionAdminClient.cookie.set(cookieName, tabId);
         }
+
+        // notify backend to index the tab
+        SessionAdminClient.notifyNewTab(tabId);
 
         // Notify backend softly when tab is closing
         window.addEventListener('beforeunload', () => {

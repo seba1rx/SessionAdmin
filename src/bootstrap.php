@@ -18,6 +18,23 @@ if (!defined('__SEBA1RX_SESSIONADMIN_BOOTSTRAPPED__')) {
     $uri = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH);
     $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
+    // --- NEW TAB ENDPOINT ---------------------------------------------------
+    if ($method === 'POST' && preg_match('~^/sessionadmin/new-tab/?$~', $uri)) {
+        $input = json_decode(file_get_contents('php://input'), true);
+        $tabId = $input['tab_id'] ?? null;
+
+        error_log("## new tab: {$tabId}");
+        if ($tabId) {
+            $admin = new TabManager();
+            $admin->indexNewTab($tabId);
+        }
+
+        http_response_code(204);
+        header('Content-Type: application/json');
+        echo json_encode(['status' => 'ok']);
+        exit;
+    }
+
     // --- TAB CLOSE ENDPOINT ---------------------------------------------------
     if ($method === 'POST' && preg_match('~^/sessionadmin/tab-close/?$~', $uri)) {
         $input = json_decode(file_get_contents('php://input'), true);

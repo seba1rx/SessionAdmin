@@ -16,7 +16,7 @@ use MPA\AppFiles\MyMPASessionAdmin;
  */
 
 $conf = [];
-$conf["sessionLifetime"] = 120; // set the maximum time for the session: 2 minutes
+$conf["sessionLifetime"] = 120; // set the maximum time for the session in seconds
 $conf["allowedURLs"] = ["index.php", "page2.php"]; // set the allowed URLs (array list)
 $conf["keys"] = [ // set other starting data that will be globally accessible directly from $_SESSION
     "some_key" => "some_value", // $_SESSION['some_key']
@@ -24,10 +24,13 @@ $conf["keys"] = [ // set other starting data that will be globally accessible di
 ];
 
 $sessionAdmin = new MyMPASessionAdmin($conf);
-$sessionAdmin->useTabIndexation = false;
+$sessionAdmin->useTabIndexation = true;
 $sessionAdmin->app_isSpa = false;
 $sessionAdmin->useAuthorization = true;
 $sessionAdmin->ignoreInAuthorization = ["authentication.php"];
 $sessionAdmin->ipOctetsToCheck = 2;
 $sessionAdmin->proxyAwareIpDetection = true;
 $sessionAdmin->activateSession();
+
+
+error_log(json_encode($_SESSION));

@@ -3,6 +3,14 @@
 <html>
 <head>
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+    <!-- SessionAdminClient -->
+    <script src="assets/seba1rx_sessionAdmin.js"></script>
+    <script>
+        // Optional: enable automatic tab cleanup
+        window.SESSIONADMIN_AUTO_DESTROY = true;
+        window.SESSIONADMIN_DEBUG = true;
+        window.SESSIONADMIN_DEBUG_UI = true;
+    </script>
 </head>
 <body>
     <div class="wrapper p-5">
@@ -53,3 +61,4 @@
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
 </body>
 </html>
+<?php error_log("## at index in MPA"); ?>
