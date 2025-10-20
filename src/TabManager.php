@@ -21,7 +21,6 @@ class TabManager
      */
     protected function getTabId(): ?string
     {
-        // error_log("## cookies: " . json_encode($_COOKIE));
         return $_COOKIE['SESSIONADMIN_TABID'] ?? null;
     }
 
@@ -31,10 +30,8 @@ class TabManager
     public function set(string $key, $value): void
     {
         $tabId = $this->getTabId();
-        // error_log("## tabId pre");
         if (!$tabId) return;
 
-        // error_log("## tabId {$tabId} setting {$key} => {$value}");
         $_SESSION[$this->sessionKey][$tabId]['data'][$key] = $value;
         $_SESSION[$this->sessionKey][$tabId]['is_active'] = true;
         $_SESSION[$this->sessionKey][$tabId]['last_active'] = time();

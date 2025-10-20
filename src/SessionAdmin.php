@@ -133,7 +133,6 @@ abstract class SessionAdmin{
      */
     public $useTabIndexation = true;
 
-
     /**
      * Extend this class and define a constructor, here you have a template for a MPA app:
      *

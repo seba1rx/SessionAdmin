@@ -15,3 +15,5 @@ $tab_sessionAdmin->useAuthorization = true;
 $tab_sessionAdmin->ipOctetsToCheck = 2;
 $tab_sessionAdmin->proxyAwareIpDetection = true;
 $tab_sessionAdmin->activateSession();
+
+error_log("### ### in session admin conf");

@@ -6,6 +6,8 @@
  *  - POST /sessionadmin/tab-close
  *  - GET  /sessionadmin/debug  (JSON or HTML if SESSIONADMIN_DEBUG_UI)
  *  - POST /sessionadmin/debug/delete-tab
+ *
+ * if seba1rx_sessionAdmin.js is included these endpoints will be called automatically
  */
 
 use Seba1rx\SessionAdmin\TabManager;
@@ -71,7 +73,8 @@ if (!defined('__SEBA1RX_SESSIONADMIN_BOOTSTRAPPED__')) {
             exit;
         }
 
-        $tabs = sessionAdmin()->tabManager->debug();
+        $tabManager = new TabManager();
+        $tabs = $tabManager->debug();
 
         // --- HTML MODE --------------------------------------------------------
         if (defined('SESSIONADMIN_DEBUG_UI') && SESSIONADMIN_DEBUG_UI === true) {
@@ -168,6 +171,7 @@ if (!defined('__SEBA1RX_SESSIONADMIN_BOOTSTRAPPED__')) {
             'version' => '1.0.0',
             'session_key' => $tabManager->getSessionKey(),
             'tabs' => $tabs,
+            'session' => $_SESSION,
         ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
         exit;
     }
