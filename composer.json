@@ -12,7 +12,8 @@
     "autoload": {
         "psr-4": {
             "Seba1rx\\SessionAdmin\\": "src/",
-            "Seba1rx\\SessionAdmin\\Exceptions\\": "Exceptions/"
+            "Seba1rx\\SessionAdmin\\Exceptions\\": "Exceptions/",
+            "Seba1rx\\SessionAdmin\\Build\\": "build/"
         },
         "files": [
             "src/bootstrap.php"
@@ -21,14 +22,14 @@
     "scripts": {
         "test": "phpunit --colors=always",
         "post-install-cmd": [
-            "Seba1rx\\SessionAdmin\\ComposerScripts::publishAssets",
+            "Seba1rx\\SessionAdmin\\Build\\ComposerScripts::publishAssets",
             "php -r \"copy(__DIR__.'/script/seba1rx_sessionadmin.js', getcwd().'/seba1rx_sessionadmin.js');\""
         ],
         "post-update-cmd": [
-            "Seba1rx\\SessionAdmin\\ComposerScripts::publishAssets"
+            "Seba1rx\\SessionAdmin\\Build\\ComposerScripts::publishAssets"
         ],
         "publish-assets": [
-            "Seba1rx\\SessionAdmin\\ComposerScripts::publishAssets"
+            "Seba1rx\\SessionAdmin\\Build\\ComposerScripts::publishAssets"
         ]
     },
     "extra": {

@@ -1,6 +1,6 @@
 <?php
 
-namespace Seba1rx\SessionAdmin;
+namespace Seba1rx\SessionAdmin\Build;
 
 use Composer\Script\Event;
 
