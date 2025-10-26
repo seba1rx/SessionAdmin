@@ -73,13 +73,13 @@ abstract class Session{
 
 
     /**
-     * returns true if the Session has the key isUser and the value is true
-     * * empty() automatically returns false if the key doesn’t exist and the value is falsy
-     *
-     * @return bool
-     */
+     * Returns true if the Session has the key isUser and the value is true
+    *
+    * @return bool
+    */
     protected function currentStateIsUser(): bool
     {
+        // empty() automatically returns false if the key doesn’t exist and the value is falsy
         return !empty($_SESSION['isUser']);
     }
 

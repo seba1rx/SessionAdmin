@@ -16,14 +16,14 @@
             "Seba1rx\\SessionAdmin\\Build\\": "build/"
         },
         "files": [
-            "src/bootstrap.php"
+            "bin/bootstrap.php"
         ]
     },
     "scripts": {
         "test": "phpunit --colors=always",
         "post-install-cmd": [
             "Seba1rx\\SessionAdmin\\Build\\ComposerScripts::publishAssets",
-            "php -r \"copy(__DIR__.'/script/seba1rx_sessionadmin.js', getcwd().'/seba1rx_sessionadmin.js');\""
+            "php -r \"copy(__DIR__.'/assets/seba1rx_sessionadmin.js', getcwd().'/seba1rx_sessionadmin.js');\""
         ],
         "post-update-cmd": [
             "Seba1rx\\SessionAdmin\\Build\\ComposerScripts::publishAssets"
@@ -34,7 +34,7 @@
     },
     "extra": {
         "publish": {
-            "scripts/seba1rx_sessionAdmin.js": "seba1rx_sessionAdmin.js"
+            "assets/seba1rx_sessionAdmin.js": "seba1rx_sessionAdmin.js"
         }
     },
     "require": {

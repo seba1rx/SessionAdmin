@@ -5,11 +5,11 @@ namespace Seba1rx\SessionAdmin;
 use Seba1rx\SessionAdmin\TabManager;
 
 /**
- * Extend this class to customize it by creating your own constructor
+ * This class is defined as abstract to force to implement it by extending it.
  *
- * This class is defined as abstract to force implementing a class extending this class to define a constructor
+ * This class has no abstract methods, so just extend this class by defining a constructor.
  *
- * There are no abstract methods in this class, but it is intended to be implemented with a custom constructor.
+ * You will find a template here or you can check the demos
  */
 abstract class SessionAdmin extends Session{
 
@@ -130,6 +130,7 @@ abstract class SessionAdmin extends Session{
             unset($this->tabManager);
         }
 
+        // assign the keys defined
         foreach($this->keys as $key => $item){
             if(!isset($_SESSION[$key])){
                 $_SESSION[$key] = $item;
