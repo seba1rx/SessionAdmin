@@ -9,7 +9,7 @@ class ComposerStaticInit3fc4d201b7dfa563b2e237b72c6f7f9a
     public static $files = array (
         '6124b4c8570aa390c21fafd04a26c69f' => __DIR__ . '/..' . '/myclabs/deep-copy/src/DeepCopy/deep_copy.php',
         'ec07570ca5a812141189b1fa81503674' => __DIR__ . '/..' . '/phpunit/phpunit/src/Framework/Assert/Functions.php',
-        '30bb46d11227dd4f93b2c496d6d16a8d' => __DIR__ . '/../..' . '/src/bootstrap.php',
+        '4db63912e68cebb3c180988a61a1fb15' => __DIR__ . '/../..' . '/bin/bootstrap.php',
     );
 
     public static $prefixLengthsPsr4 = array (
@@ -17,6 +17,7 @@ class ComposerStaticInit3fc4d201b7dfa563b2e237b72c6f7f9a
         array (
             'Seba1rx\\SessionAdmin\\Tests\\' => 27,
             'Seba1rx\\SessionAdmin\\Exceptions\\' => 32,
+            'Seba1rx\\SessionAdmin\\Build\\' => 27,
             'Seba1rx\\SessionAdmin\\' => 21,
         ),
         'P' => 
@@ -37,6 +38,10 @@ class ComposerStaticInit3fc4d201b7dfa563b2e237b72c6f7f9a
         'Seba1rx\\SessionAdmin\\Exceptions\\' => 
         array (
             0 => __DIR__ . '/../..' . '/Exceptions',
+        ),
+        'Seba1rx\\SessionAdmin\\Build\\' => 
+        array (
+            0 => __DIR__ . '/../..' . '/build',
         ),
         'Seba1rx\\SessionAdmin\\' => 
         array (

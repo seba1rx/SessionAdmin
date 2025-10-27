@@ -15,13 +15,13 @@
 <body>
     <div class="wrapper p-5">
         <div class="row mt-5 justify-content-center">
-            <div class="col-lg-8 col-sm-10 <?php echo ($_SESSION['urlIsAllowedToLoad'] ?? true ? 'bg-info': 'bg-danger'); ?> text-center text-white">
+            <div class="col-lg-8 col-sm-10 <?php echo ($_SESSION['sessionadmin']['urlIsAllowedToLoad'] ?? true ? 'bg-info': 'bg-danger'); ?> text-center text-white">
                 <h3>Private content, you are in private.php</h3>
                 <p>you are in private.php</p>
 
-                <p><?php echo ($_SESSION['urlIsAllowedToLoad']? '': 'You have disabled the validation in required.php'); ?></p>
+                <p><?php echo ($_SESSION['sessionadmin']['urlIsAllowedToLoad']? '': 'You have disabled the validation in required.php'); ?></p>
 
-                <?php if($_SESSION['isUser']){ ?>
+                <?php if($_SESSION['sessionadmin']['isUser']){ ?>
                 <img src="images/<?php echo $_SESSION['data']['avatar']; ?>" alt="avatar" style="max-width: 100px;" class="img-thumbnail mb-1 bg-info">
                 <?php } ?>
 
@@ -44,7 +44,7 @@
 
                         <br>
 
-                        <?php if($_SESSION['isUser']){ ?>
+                        <?php if($_SESSION['sessionadmin']['isUser']){ ?>
                         <a href="exit.php" class="btn btn-success mt-2">Log out</a>
                         <?php } ?>
 

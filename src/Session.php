@@ -9,6 +9,61 @@ abstract class Session{
 
     const IP_REGEX = '/(\d{1,3}\.\d{1,3}\.\d{1,3}\.)(\d{1,3})/';
 
+        /**
+     * array list containing the file names that will be checked in the authorization process
+     *
+     * @var array
+     */
+    protected $allowedUrls = [];
+
+    /**
+     * assoc array that you can pass to load into the session
+     *
+     * @var array
+     */
+    protected $keys = [];
+
+    /**
+     * will hold a unique ID to identify the session (it could be handy to have)
+     *
+     * @var string
+     */
+    protected $uniqueId;
+
+    /**
+     * if true, will check against $allowedUrls
+     *
+     * @var boolean
+     */
+    public $useAuthorization = false;
+
+    /**
+     * if true will override all authorization since it only make since in MPA applications,
+     * allowing you to implement your own way to authorize in a SPA app like using middlewares.
+     *
+     * @var boolean
+     */
+    public $app_isSpa = true;
+
+    /**
+     * Handy property to prevent some actions while unit testing
+     * @var boolean
+     */
+    protected $isRunningTests = false;
+
+    /**
+     * will hold the instance of the TabManager class
+     * @var TabManager
+     */
+    public $tabManager;
+
+    /**
+     * If true will use TabManager class to manage the set and get of session vars by indexing under tab Uuid
+     *
+     * @var boolean
+     */
+    public $useTabIndexation = true;
+
     /**
      * The secconds the session will be alive between requests
      *
@@ -71,6 +126,12 @@ abstract class Session{
      */
     public $ignoreInAuthorization = [];
 
+    /**
+     * If true, when terminate() function is called, the request will be redirected to index
+     * @var boolean
+     */
+    public $terminateRedirects = true;
+
 
     /**
      * Returns true if the Session has the key isUser and the value is true
@@ -80,7 +141,7 @@ abstract class Session{
     protected function currentStateIsUser(): bool
     {
         // empty() automatically returns false if the key doesn’t exist and the value is falsy
-        return !empty($_SESSION['isUser']);
+        return !empty($_SESSION['sessionadmin']['isUser']);
     }
 
     /**
@@ -102,10 +163,11 @@ abstract class Session{
     {
         // setting / resetting session
         $_SESSION = [];
-        $_SESSION['isUser'] = FALSE;
-        $_SESSION['msg'] = 'you are a guest';
-        $_SESSION['allowedUrl'] = $this->allowedUrls;
-        $_SESSION['urlIsAllowedToLoad'] = FALSE; // by default
+        $_SESSION['sessionadmin'] = [];
+        $_SESSION['sessionadmin']['isUser'] = FALSE;
+        $_SESSION['sessionadmin']['msg'] = 'you are a guest';
+        $_SESSION['sessionadmin']['allowedUrl'] = $this->allowedUrls;
+        $_SESSION['sessionadmin']['urlIsAllowedToLoad'] = FALSE; // by default
     }
 
     /**
@@ -150,11 +212,11 @@ abstract class Session{
     {
         $time = time();
         $previous = time();
-        if(isset($_SESSION['time_atRequest'])){
-            $previous = $_SESSION['time_atRequest'];
+        if(isset($_SESSION['sessionadmin']['time_atRequest'])){
+            $previous = $_SESSION['sessionadmin']['time_atRequest'];
         }
-        $_SESSION['time_atRequest'] = $time;
-        $_SESSION['time_sinceLastRequest'] = $time - $previous;
+        $_SESSION['sessionadmin']['time_atRequest'] = $time;
+        $_SESSION['sessionadmin']['time_sinceLastRequest'] = $time - $previous;
     }
 
     /**
@@ -164,54 +226,7 @@ abstract class Session{
      */
     protected function requestIsObsolete(): bool
     {
-        return ($_SESSION['time_sinceLastRequest'] > $this->sessionLifetime ? TRUE : FALSE);
-    }
-
-    /**
-     * Calls to destroySession if request is obsolete
-     * * session always exists when this function is called
-     * * if request is still on time, checks if request is hijacking attempt
-     *
-     * @return void
-     */
-    protected function checkTime(): void
-    {
-        if($this->requestIsObsolete()){
-            $this->destroySession();
-        }else{
-
-            if ($this->requestIsHijackingAttempt()) {
-
-                // Reset session data and regenerate id
-                $_SESSION = [];
-                if($this->proxyAwareIpDetection){
-                    $_SESSION['ipAddress'] = $this->getIpAddress_proxyAware();
-                }else{
-                    $_SESSION['ipAddress'] = $this->getIpAddress_noProxys();
-                }
-                $_SESSION['userAgent'] = $this->getUserAgent();
-                $this->regenerateSession();
-
-                // Give a 3% chance of the session id changing on any request
-            } elseif ($this->shouldRandomlyRegenerate()) {
-                $this->regenerateSession();
-            }
-        }
-    }
-
-    /**
-     * Clears $_SESSION, destroys current session, and calls to start new session as guest
-     *
-     * @return void
-     */
-    protected function destroySession(): void
-    {
-        if(isset($_SESSION)){
-            $_SESSION = [];
-            session_write_close();
-            session_destroy();
-            $this->activateSession();
-        }
+        return ($_SESSION['sessionadmin']['time_sinceLastRequest'] > $this->sessionLifetime ? TRUE : FALSE);
     }
 
     /**
@@ -224,22 +239,22 @@ abstract class Session{
      */
     protected function checkIfUrlIsAllowed(): void
     {
-        if(empty($_SESSION['allowedUrl'])) throw new SessionAdminException("the allowedUrl key is empty");
-        $_SESSION['urlIsAllowedToLoad'] = FALSE;
+        if(empty($_SESSION['sessionadmin']['allowedUrl'])) throw new SessionAdminException("the allowedUrl key is empty");
+        $_SESSION['sessionadmin']['urlIsAllowedToLoad'] = FALSE;
         $url_to_check = basename($_SERVER['PHP_SELF']);
 
         if(in_array($url_to_check, $this->ignoreInAuthorization)){
             return;
         }
 
-        foreach($_SESSION['allowedUrl'] AS $allowed){
+        foreach($_SESSION['sessionadmin']['allowedUrl'] AS $allowed){
             $url_to_compare_against = $this->getSubStrAfterLast($allowed, '/');
             if($url_to_check == $url_to_compare_against){
-                $_SESSION['urlIsAllowedToLoad'] = TRUE;
+                $_SESSION['sessionadmin']['urlIsAllowedToLoad'] = TRUE;
                 break;
             }
         }
-        if(!$_SESSION['urlIsAllowedToLoad'] && $this->useAuthorization){
+        if(!$_SESSION['sessionadmin']['urlIsAllowedToLoad'] && $this->useAuthorization){
             $this->redirectToIndex();
             // header('Location: index.php');
         }
@@ -265,17 +280,17 @@ abstract class Session{
         }
         $ipPrefix = $this->getIpPrefix($ipAddress, $this->ipOctetsToCheck);
 
-        if (!isset($_SESSION['ipPrefix'], $_SESSION['userAgent'])) {
-            $_SESSION['ipPrefix'] = $ipPrefix;
-            $_SESSION['userAgent'] = $userAgent;
+        if (!isset($_SESSION['sessionadmin']['ipPrefix'], $_SESSION['sessionadmin']['userAgent'])) {
+            $_SESSION['sessionadmin']['ipPrefix'] = $ipPrefix;
+            $_SESSION['sessionadmin']['userAgent'] = $userAgent;
             return false; // first request → not hijacking
         }
 
-        if ($_SESSION['ipPrefix'] !== $ipPrefix) {
+        if ($_SESSION['sessionadmin']['ipPrefix'] !== $ipPrefix) {
             return true; // possible hijacking
         }
 
-        if ($_SESSION['userAgent'] !== $userAgent) {
+        if ($_SESSION['sessionadmin']['userAgent'] !== $userAgent) {
             return true; // possible hijacking
         }
 

@@ -34,16 +34,17 @@ if(
     $sessionAdmin->createUserSession($data['id']);
 
     /**
-     * since $_SESSION is a global variable there is no point in encapsulating
-     * the data with get and set...
-     * lets add the data to SESSION['data']
+     * In this demo I will be using the key 'data'
+     * you can use any key you want to add the data (if any)
+     * add the data to SESSION['data']
      */
     foreach($data AS $dataName => $dataValue){
         $_SESSION['data'][$dataName] = $dataValue;
     }
 
     /**
-     * lets suppose you query the database and get all the pages the authenticated user can see
+     * In a very simple authorization MPA app you need to controll the pages the user can request.
+     * lets suppose you query the database to get all the pages the authenticated user can visit
      */
     // $ProfileAllowedUrls = myMethodThatObtainsTheAllowedPages($data['profile']);
     $ProfileAllowedUrls = [
@@ -52,10 +53,10 @@ if(
     ];
 
     /**
-     * here you would iterate to add allowed urls according to assigned profile
+     * adding the allowed pages to a session var
      */
     foreach($ProfileAllowedUrls AS $url){
-       $_SESSION['allowedUrl'][] = $url;
+       $_SESSION['sessionadmin']['allowedUrl'][] = $url;
     }
 
     $validationResponse['ok'] = true;

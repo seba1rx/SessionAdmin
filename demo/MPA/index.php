@@ -15,12 +15,12 @@
 <body>
     <div class="wrapper p-5">
         <div class="row mt-5 justify-content-center">
-            <div class="col-lg-8 col-sm-10 <?php echo ($_SESSION['urlIsAllowedToLoad'] ?? true ? 'bg-info': 'bg-danger'); ?> text-center text-white">
+            <div class="col-lg-8 col-sm-10 <?php echo ($_SESSION['sessionadmin']['urlIsAllowedToLoad'] ?? true ? 'bg-info': 'bg-danger'); ?> text-center text-white">
                 <h3>Public content, you are in index.php</h3>
                 <p>Anyone can see this content, you are in index.php</p>
 
-                <?php if($_SESSION['isUser']){ ?>
-                <img src="<?php echo $_SESSION['data']['avatar']; ?>" alt="avatar" style="max-width: 100px;" class="img-thumbnail mb-1 bg-info">
+                <?php if($_SESSION['sessionadmin']['isUser']){ ?>
+                <img src="images/<?php echo $_SESSION['data']['avatar']; ?>" alt="avatar" style="max-width: 100px;" class="img-thumbnail mb-1 bg-info">
                 <?php } ?>
 
             </div>
@@ -45,7 +45,7 @@
 
                         <br>
 
-                        <?php if($_SESSION['isUser']){ ?>
+                        <?php if($_SESSION['sessionadmin']['isUser']){ ?>
                         <a href="exit.php" class="btn btn-success mt-2">Log out</a>
                         <?php } ?>
 
@@ -61,4 +61,3 @@
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
 </body>
 </html>
-<?php error_log("## at index in MPA"); ?>

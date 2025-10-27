@@ -8,6 +8,7 @@ $baseDir = dirname($vendorDir);
 return array(
     'Seba1rx\\SessionAdmin\\Tests\\' => array($baseDir . '/tests'),
     'Seba1rx\\SessionAdmin\\Exceptions\\' => array($baseDir . '/Exceptions'),
+    'Seba1rx\\SessionAdmin\\Build\\' => array($baseDir . '/build'),
     'Seba1rx\\SessionAdmin\\' => array($baseDir . '/src'),
     'PhpParser\\' => array($vendorDir . '/nikic/php-parser/lib/PhpParser'),
     'DeepCopy\\' => array($vendorDir . '/myclabs/deep-copy/src/DeepCopy'),

@@ -74,9 +74,11 @@ class MyMPASessionAdmin extends SessionAdmin{
 
         /**
          * Define the "allowedURLs" item in the $conf parameter
-         * in order to indicate what pages are allowed to load,
-         * you can add or remove the allowed pages in
-         * authentication by implementing a profile controller.
+         * in order to tell to the SessionAdmin instance what
+         * pages are allowed to load (Authorization),
+         * you can add or remove the allowed pages in your
+         * authentication process by implementing a profile
+         * controller.
          *
          * $conf["allowedURLs"] = ["index.php", "page2.php"];
          *
@@ -100,8 +102,8 @@ class MyMPASessionAdmin extends SessionAdmin{
          * $conf["keys"] = ["foo" => "bar", "baz" => 123];
          *
          * You can access your data like this:
-         * $foo = $_SESSION["data"]["foo"]; // "bar"
-         * $baz = $_SESSION["data"]["baz"]; // 123
+         * $foo = $_SESSION["foo"]; // "bar"
+         * $baz = $_SESSION["baz"]; // 123
          */
         if(isset($conf["keys"])){
             foreach($conf["keys"] as $key => $value){

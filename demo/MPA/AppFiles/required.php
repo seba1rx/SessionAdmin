@@ -30,7 +30,7 @@ $sessionAdmin->useAuthorization = true;
 $sessionAdmin->ignoreInAuthorization = ["authentication.php"];
 $sessionAdmin->ipOctetsToCheck = 2;
 $sessionAdmin->proxyAwareIpDetection = true;
+$sessionAdmin->terminateRedirects = true;
 $sessionAdmin->activateSession();
 
-
-error_log(json_encode($_SESSION));
+error_log("## app after: " . json_encode($_SESSION));

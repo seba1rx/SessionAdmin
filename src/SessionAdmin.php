@@ -2,8 +2,6 @@
 
 namespace Seba1rx\SessionAdmin;
 
-use Seba1rx\SessionAdmin\TabManager;
-
 /**
  * This class is defined as abstract to force to implement it by extending it.
  *
@@ -12,61 +10,6 @@ use Seba1rx\SessionAdmin\TabManager;
  * You will find a template here or you can check the demos
  */
 abstract class SessionAdmin extends Session{
-
-    /**
-     * array list containing the file names that will be checked in the authorization process
-     *
-     * @var array
-     */
-    protected $allowedUrls = [];
-
-    /**
-     * assoc array that you can pass to load into the session
-     *
-     * @var array
-     */
-    protected $keys = [];
-
-    /**
-     * will hold a unique ID to identify the session (it could be handy to have)
-     *
-     * @var string
-     */
-    private $uniqueId;
-
-    /**
-     * if true, will check against $allowedUrls
-     *
-     * @var boolean
-     */
-    public $useAuthorization = false;
-
-    /**
-     * if true will override all authorization since it only make since in MPA applications,
-     * allowing you to implement your own way to authorize in a SPA app like using middlewares.
-     *
-     * @var boolean
-     */
-    public $app_isSpa = true;
-
-    /**
-     * Handy property to prevent some actions while unit testing
-     * @var boolean
-     */
-    private $isRunningTests = false;
-
-    /**
-     * will hold the instance of the TabManager class
-     * @var TabManager
-     */
-    public $tabManager;
-
-    /**
-     * If true will use TabManager class to manage the set and get of session vars by indexing under tab Uuid
-     *
-     * @var boolean
-     */
-    public $useTabIndexation = true;
 
     /**
      * Extend this class and define a constructor, here you have a template for a MPA app:
@@ -86,7 +29,7 @@ abstract class SessionAdmin extends Session{
      */
 
     /**
-     * Starts a new session as guest or renewes user session if $_SESSION['uniqueId'] is set
+     * Starts a new session as guest or renewes user session if $_SESSION['sessionadmin']['uniqueId'] is set
      *
      * @return void
      */
@@ -97,10 +40,12 @@ abstract class SessionAdmin extends Session{
 
         session_start();
 
+        if(!isset($_SESSION['sessionadmin'])) $_SESSION['sessionadmin'] = [];
+
         $this->setSessionTimeStamps();
 
         $this->uniqueId = bin2hex(random_bytes(6));
-        $_SESSION['uniqueId'] = $this->uniqueId;
+        $_SESSION['sessionadmin']['uniqueId'] = $this->uniqueId;
 
         if($this->currentStateIsUser()){
             # user
@@ -109,14 +54,6 @@ abstract class SessionAdmin extends Session{
             # guest
             $this->configureGuestSession();
         }
-
-        // if(isset($_SESSION['uniqueId'])){
-        //     # user
-        //     $this->checkTime();
-        // }else{
-        //     # guest
-        //     $this->configureGuestSession();
-        // }
 
         // only check url when app is MPA
         if($this->useAuthorization && !$this->app_isSpa){
@@ -130,7 +67,7 @@ abstract class SessionAdmin extends Session{
             unset($this->tabManager);
         }
 
-        // assign the keys defined
+        // assign the defined keys to the root of $_SESSION var (if any)
         foreach($this->keys as $key => $item){
             if(!isset($_SESSION[$key])){
                 $_SESSION[$key] = $item;
@@ -149,17 +86,17 @@ abstract class SessionAdmin extends Session{
         // $this->uniqueId = bin2hex(random_bytes(6));
         // $_SESSION['uniqueId'] = $this->uniqueId;
 
-        $_SESSION['isUser'] = TRUE;
-        $_SESSION['msg'] = 'you are a user';
-        $_SESSION['id_user'] = $id_user;
-        $_SESSION['urlIsAllowedToLoad'] = FALSE;
+        $_SESSION['sessionadmin']['isUser'] = TRUE;
+        $_SESSION['sessionadmin']['msg'] = 'you are a user';
+        $_SESSION['sessionadmin']['id_user'] = $id_user;
+        $_SESSION['sessionadmin']['urlIsAllowedToLoad'] = FALSE;
 
         $this->setSessionTime();
         $this->setSessionTimeStamps();
     }
 
     /**
-     * Wipes out all session data, sends the request to safe pace
+     * Terminates the session by wiping out all session data, sends the request to safe pace (if configured)
      *
      * @return void
      */
@@ -171,8 +108,58 @@ abstract class SessionAdmin extends Session{
 
         // only for MPA
         if(!$this->app_isSpa && !$this->isRunningTests){
-            /** go to safe page */
-            $this->redirectToIndex();
+            if($this->terminateRedirects){
+                /** go to safe page */
+                $this->redirectToIndex();
+            }
+        }
+    }
+
+    /**
+     * Clears $_SESSION, destroys current session, and calls to start new session as guest
+     *
+     * @return void
+     */
+    protected function destroySession(): void
+    {
+        if(isset($_SESSION)){
+            $_SESSION = [];
+            session_write_close();
+            session_destroy();
+            $this->activateSession();
+        }
+    }
+
+    /**
+     * Calls to destroySession if request is obsolete
+     * * session always exists when this function is called
+     * * if request is still on time, checks if request is hijacking attempt
+     *
+     * @return void
+     */
+    protected function checkTime(): void
+    {
+        if($this->requestIsObsolete()){
+            $this->destroySession();
+        }else{
+
+            if ($this->requestIsHijackingAttempt()) {
+
+                // Reset session data and regenerate id
+                $_SESSION = [];
+                $_SESSION['sessionadmin'] = [];
+                if($this->proxyAwareIpDetection){
+                    $_SESSION['sessionadmin']['ipAddress'] = $this->getIpAddress_proxyAware();
+                }else{
+                    $_SESSION['sessionadmin']['ipAddress'] = $this->getIpAddress_noProxys();
+                }
+                $_SESSION['sessionadmin']['userAgent'] = $this->getUserAgent();
+                $this->regenerateSession();
+
+                // Give a 3% chance of the session id changing on any request
+            } elseif ($this->shouldRandomlyRegenerate()) {
+                $this->regenerateSession();
+            }
         }
     }
 
