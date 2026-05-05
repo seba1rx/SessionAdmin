@@ -9,7 +9,7 @@ each page is a separate PHP file and navigation is enforced server-side.
 
 | File | Visibility | Description |
 |---|---|---|
-| `index.php` | Public | Landing page, shows session data |
+| `index.php` | Public | Landing page, shows full session dump |
 | `page2.php` | Public | Contains the login form |
 | `private.php` | Private | Accessible only after login |
 | `exit.php` | — | Destroys the session and redirects to `index.php` |
@@ -35,13 +35,28 @@ lookup without actually querying one.
 
 ---
 
+## Configuration at a glance (`AppFiles/required.php`)
+
+| Property | Value | Note |
+|---|---|---|
+| `sessionName` | `MyCustomMPASessionName` | Name of the session cookie |
+| `sessionLifetime` | `120` s | 2-minute idle timeout — short so you can observe expiry quickly |
+| `allowedURLs` | `['index.php', 'page2.php']` | Guest-accessible pages |
+| `useAuthorization` | `true` | URL enforcement active |
+| `appIsSpa` | `false` | MPA mode |
+| `useTabIndexation` | `true` | TabManager enabled — session has a `tabs` section |
+| `ignoreInAuthorization` | `['authentication.php']` | Login endpoint bypasses the URL check |
+| `keys` | `['some_key' => 'some_value', 'foo' => 'bar']` | Pre-seeded keys injected into `$_SESSION` on every request |
+
+---
+
 ## Files worth reading
 
 | File | What it shows |
 |---|---|
 | `AppFiles/MyMPASessionAdmin.php` | Minimal concrete subclass — constructor sets name, lifetime, and allowed URLs |
 | `AppFiles/required.php` | Bootstraps the session on every page; the single source of configuration |
-| `AppFiles/authentication.php` | Login endpoint — calls `createUserSession()`, then extends `allowedUrl` with profile-specific pages |
+| `AppFiles/authentication.php` | Login endpoint — calls `createUserSession()`, stores user data, extends `allowedUrl` with profile-specific pages |
 | `exit.php` | Calls `terminate()`, which destroys the session and redirects |
 
 ---
@@ -50,48 +65,64 @@ lookup without actually querying one.
 
 ### URL authorization
 
-`required.php` passes `allowedURLs: ['index.php', 'page2.php']` and sets
-`useAuthorization = true`. Try navigating to `private.php` while logged out —
-the library redirects you back to `index.php` automatically.
+`required.php` sets `useAuthorization = true` with guest pages `['index.php',
+'page2.php']`. Try navigating directly to `private.php` while logged out — the
+library redirects you to `index.php` automatically.
 
-`authentication.php` is in `ignoreInAuthorization` so the login POST itself
-is never blocked.
+`authentication.php` is listed in `ignoreInAuthorization` so the login POST is
+never blocked by the URL check.
 
 ### How `allowedUrl` grows on login
 
-The session dump (visible on every page) shows `sessionadmin.allowedUrl`. As a
+Open the session dump on any page and watch `sessionadmin.allowedUrl`. As a
 guest it contains only the two public pages. After login, `authentication.php`
-appends `private.php` to that list so the user can reach the private page.
-After logout the list resets to the guest config.
+appends `private.php` so the authenticated user can reach the private page.
+Logging out resets the list back to the guest config.
 
-### `appType` and MPA-only session keys
+### MPA-only session keys
 
 Because `appIsSpa = false`, the session contains keys that are absent in SPA
 mode:
 
-| Key | Value | Meaning |
-|---|---|---|
-| `appType` | `"MPA"` | Confirms the app is running in MPA mode |
-| `allowedUrl` | `["index.php", "page2.php"]` (guest) / `[..., "private.php"]` (user) | Pages the current role may visit |
-| `urlIsAllowedToLoad` | `true` / `false` | Whether the current page passed the authorization check |
+| Key | Guest value | User value | Meaning |
+|---|---|---|---|
+| `appType` | `"MPA"` | `"MPA"` | Confirms MPA mode |
+| `allowedUrl` | `["index.php", "page2.php"]` | `[..., "private.php"]` | Pages the current role may visit |
+| `urlIsAllowedToLoad` | `true` / `false` | `true` / `false` | Whether the current page passed the authorization check |
 
-The page header turns green when `urlIsAllowedToLoad` is `true` and grey/red
-otherwise.
+The page header turns **green** when `urlIsAllowedToLoad` is `true`. On
+`index.php` and `page2.php` it turns grey when false; on `private.php` it turns
+red.
+
+### Tab indexation
+
+`useTabIndexation = true` is set, so the JS client assigns a UUID to each
+browser tab and the session has a `tabs` section. Open the same URL in two
+different tabs and observe two separate entries under `tabs` in the dump.
+Visit `http://localhost:8000/sessionadmin/debug` to see the tab manager's debug
+view.
 
 ### Session security keys
 
-The dump also shows the keys written by the security layer on every request:
+The dump shows the keys written by the security layer on every request:
 
 | Key | Purpose |
 |---|---|
 | `uniqueId` | 12-char hex token, stable for the full session lifetime (guest and user) |
-| `ipPrefix` | First two octets of the client IP — checked on every request to detect hijacking |
+| `ipPrefix` | First two octets of the client IP — compared on every request to detect hijacking |
 | `userAgent` | Browser User-Agent — checked alongside `ipPrefix` |
 | `time_atRequest` | Unix timestamp of the last request |
-| `time_sinceLastRequest` | Elapsed seconds — compared against `sessionLifetime` to expire idle sessions |
+| `time_sinceLastRequest` | Elapsed seconds since the previous request — compared against `sessionLifetime` (120 s) to expire idle sessions |
 
 ### Session regeneration
 
 `createUserSession()` regenerates the session ID on login to prevent session
-fixation. You can observe the `SESSION` cookie value changing in the browser's
-DevTools → Application → Cookies after submitting the login form.
+fixation. Watch the `MyCustomMPASessionName` cookie value in DevTools →
+Application → Cookies before and after submitting the login form — it changes.
+
+### Pre-seeded custom keys
+
+`required.php` passes `keys: ['some_key' => 'some_value', 'foo' => 'bar']`.
+These appear at the root of `$_SESSION` alongside `sessionadmin` and `tabs`.
+They demonstrate how to inject application-level defaults that are only written
+when the key does not yet exist.
