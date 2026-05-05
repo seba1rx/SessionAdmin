@@ -1,216 +1,133 @@
-# PHP session admin
+# TABS Demo — SPA with Per-Tab Session Isolation
 
-A lightweight library that provides **session isolation per browser tab**, so each tab gets its own `$_SESSION` space and also **security against hijacking**.
-Useful for apps where multiple tabs can interfere with each other’s session state.
-
-## Installation
-
-```bash
-composer require seba1rx/sessionadmin
-```
-
-The SessionAdmin class has 3 public methods:
-```bash
-activateSession()
-createUserSession()
-terminate()
-```
-
-
-The SessionAdmin class is fully documented so you can check each method or property in order to get to understand it better.
-
-### The SessionAdmin class is defined as an abstract class but has no abstract methods, it is intended to be extended by implementing a custom constructor.
-
-In order to get an implementation idea go check the demos.
-
-## There are 3 demos
-* MPA (Multi Page Application)
-* SPA (Single Page Application)
-* TABS (SPA + tab uuid)
+Demonstrates per-browser-tab session isolation in a single-page PHP application.
+Each browser tab gets its own scoped storage under `$_SESSION['tabs'][{uuid}]`,
+managed automatically by `TabManager` and the JS client.
 
 ---
-## 🚀 Features
 
-    ✅ Creates a session for guest and users
-    ✅ Named session
-    ✅ 3% chances of regenerating session id on each request to prevent session fixation
-    ✅ Prevents hijacking
-    ✅ session destruction on obsolete request
-    ✅ proxy-aware ip detection
-    ✅ Optional in MPA: Define allowed URL array for guests, that can be expanded when user logs in according to system profile
+## Pages / routes
 
-**Per-tab PHP session isolation and management:**
+| Method | URI | Handler | Description |
+|---|---|---|---|
+| `GET` | `/` | `Controller::start` | Renders the app shell |
+| `POST` | `/hello` | `Controller::hello` | Returns a dialog greeting |
+| `POST` | `/demoData` | `Controller::demoData` | Returns sample JSON in a dialog |
+| `POST` | `/showLogin` | `Controller::showLogin` | Injects the login form into the page |
+| `POST` | `/authenticate` | `Authentication::authenticate` | Runs login, calls `createUserSession()` |
+| `POST` | `/addVarToSession` | `Controller::addVarToSession` | Stores a key/value in the current tab's session |
+| `POST` | `/tabStatus` | `Controller::tabStatus` | Reports whether the current tab is indexed |
+| `POST` | `/reloadSessionData` | `Controller::reloadSessionData` | Refreshes the session dump panel |
+| `POST` | `/logout` | `Controller::logout` | Calls `terminate()`, reloads |
+| `GET` | `/sessionadmin/debug` | bootstrap | HTML debug view of all tracked tabs |
 
-    ✅ Unique session data per browser tab
-    ✅ Automatic tab tracking via JavaScript
-    ✅ Optional session cleanup on tab close
-    ✅ Built-in debug interface (HTML + JSON)
-    ✅ Works with Fetch/XHR/HTTP requests
-    ✅ Plug-and-play bootstrap — no manual routes required
-
-
-### On each demo you will find more info about each implementation
 ---
 
-This will also publish a small JavaScript file automatically into your project root:
+## Setup and running locally
 
-> /seba1rx_sessionadmin.js
+```bash
+# 1. Install dependencies
+cd demo/TABS
+composer install
 
+# 2. Start the built-in PHP server — the router script is required
+#    so POST routes and /sessionadmin/* endpoints reach index.php
+php -S localhost:8000 index.php
 
-⚙️ Setup
+# 3. Open in browser
+# http://localhost:8000
 
-Include the JS helper in your HTML layout:
-```html
-<script src="/seba1rx_sessionadmin.js"></script>
-<script>
-    // Optional: enable automatic tab cleanup
-    window.SESSIONADMIN_AUTO_DESTROY = true;
-</script>
+# 4. Open the tab debug view in a separate browser tab
+# http://localhost:8000/sessionadmin/debug
 ```
 
-Then in PHP:
+Any email + password combination is accepted — authentication simulates a database
+lookup without actually querying one.
 
-```PHP
-require 'vendor/autoload.php';
+---
 
-use Seba1rx\SessionAdminServer\SessionAdminServer;
+## Configuration at a glance (`config/session.php`)
 
-$session = new SessionAdminServer();
+| Property | Value | Note |
+|---|---|---|
+| `sessionName` | `MyCustomTABSessionName` | Name of the session cookie |
+| `sessionLifetime` | `500` s | ~8-minute idle timeout |
+| `appIsSpa` | `true` | SPA mode — no URL authorization, no index redirect |
+| `useTabIndexation` | `true` | TabManager enabled |
+| `useAuthorization` | `false` | Irrelevant in SPA mode; explicit for clarity |
+| `ipOctetsToCheck` | `2` | First two IP octets compared on each request |
+| `proxyAwareIpDetection` | `true` | Reads IP from proxy headers |
+| `keys` | `['some_key' => 'some_value', 'foo' => 'bar']` | Pre-seeded keys injected into `$_SESSION` on first request |
 
-// Store data per tab
-$session->set('cart', ['apple' => 3, 'banana' => 2]);
+---
 
-// Retrieve per-tab data
-$cart = $session->get('cart');
+## Files worth reading
 
-// Debug info (optional)
-print_r($session->debug());
+| File | What it shows |
+|---|---|
+| `App/MyTABSessionAdmin.php` | Minimal concrete subclass — constructor sets name, lifetime, and pre-seeded keys |
+| `config/session.php` | Bootstraps the session; the single source of configuration |
+| `App/Authentication.php` | Login endpoint — calls `createUserSession()`, stores user data in `$_SESSION['data']` |
+| `App/Controller.php` | `addVarToSession()` uses `tabManager->set()` for tab-scoped storage; `tabStatus()` checks `isTabIndexed()` |
+| `index.php` | Defines `SESSIONADMIN_DEBUG` / `SESSIONADMIN_DEBUG_UI` constants and includes `bin/bootstrap.php` |
+| `assets/seba1rx_sessionAdmin.js` | JS client — generates tab UUID, sets cookie, calls `/sessionadmin/new-tab` beacon |
 
-```
+---
 
-⚙️ Constants
+## What to look for
 
-You can define the following constants in your bootstrap or entrypoint (optional):
+### Tab indexation flow
 
-| Constant                    | Type   | Default | Description                                                        |
-| --------------------------- | ------ | ------- | ------------------------------------------------------------------ |
-| `SESSIONADMIN_DEBUG`        | `bool` | `false` | Enables the `/sessionadmin/debug` endpoint                         |
-| `SESSIONADMIN_DEBUG_UI`     | `bool` | `false` | Renders the debug endpoint as an interactive HTML table            |
-| `SESSIONADMIN_AUTO_DESTROY` | `bool` | `false` | If `true`, tabs automatically mark their session inactive on close |
+1. Page loads → JS client generates a UUID per tab (stored in `sessionStorage`)
+2. UUID is synced to the `SESSIONADMIN_TABID` cookie
+3. JS sends `sendBeacon('/sessionadmin/new-tab', { tab_id: '...' })` only when the tab is genuinely new (not on refresh)
+4. Server creates the entry under `$_SESSION['tabs'][{uuid}]`
 
+Open the same URL in two browser windows — the session dump will show two distinct
+entries under `tabs`, each with its own `data` section. Refreshing does not create
+duplicate entries.
 
-Example:
+### Tab-scoped storage
 
-    define('SESSIONADMIN_DEBUG', true);
-    define('SESSIONADMIN_DEBUG_UI', true);
+Log in, then click **Add var to this tab's session**. The key/value is written only to
+the calling tab's namespace via `TabManager::set()`. Open a second window with the same
+session — the second tab won't see the variable, demonstrating true per-tab isolation.
 
-🧩 Endpoints
+### Tab status check
 
-These are automatically handled by the library through bootstrap.php:
+Click **Check if this tab is indexed** before the JS beacon has fired (very first load,
+before the beacon response completes) — you may see "not indexed". After the beacon
+completes and you reload, it shows "indexed". This demonstrates `TabManager::isTabIndexed()`.
 
-| Method | Path                             | Purpose                                                    |
-| ------ | -------------------------------- | ---------------------------------------------------------- |
-| `POST` | `/sessionadmin/tab-close`        | Marks a tab’s session as inactive (triggered on tab close) |
-| `GET`  | `/sessionadmin/debug`            | Returns session debug info (JSON or HTML)                  |
-| `POST` | `/sessionadmin/debug/delete-tab` | Deletes a specific tab’s session data (from debug UI)      |
+### Debug view
 
+Visit `http://localhost:8000/sessionadmin/debug` while the app is running. The HTML table
+shows all tracked tabs with their status (Active / Inactive), last-active timestamp, stored
+keys, and data size. The **Delete** button calls `POST /sessionadmin/debug/delete-tab`.
 
-🔍 Debug Interface
+`SESSIONADMIN_DEBUG_UI = true` is set in `index.php`. Without it the same endpoint
+returns JSON only.
 
-If SESSIONADMIN_DEBUG_UI is true, visit:
+### Tab cleanup on close
 
-👉 http://localhost/sessionadmin/debug
+`window.SESSIONADMIN_AUTO_DESTROY = true` is set in `tpl/main.php` before the JS client
+loads. This registers a `beforeunload` handler that fires `/sessionadmin/tab-close` when
+the tab closes, marking it Inactive in the debug view.
 
-You’ll see a dashboard like this:
+### Session security keys
 
-| Tab UUID   | Status   | Last Active      | Keys       | Size | Action     |
-| ---------- | -------- | ---------------- | ---------- | ---- | ---------- |
-| `7ac3d...` | ✅ Active | 2025-10-14 15:23 | cart, auth | 132  | 🗑️ Delete |
+The dump shows the keys written by the security layer on every request:
 
+| Key | Purpose |
+|---|---|
+| `uniqueId` | 12-char hex token, stable for the full session lifetime |
+| `ipPrefix` | First two octets of the client IP — compared on every request |
+| `userAgent` | Browser User-Agent — checked alongside `ipPrefix` |
+| `time_atRequest` | Unix timestamp of the last request |
+| `time_sinceLastRequest` | Elapsed seconds since the previous request — compared against `sessionLifetime` |
 
-Each row corresponds to an isolated tab session.
-You can delete individual tab data directly.
+### Pre-seeded custom keys
 
-🧠 How It Works
-
-1 On page load, JS generates a unique UUID per tab (stored in sessionStorage)
-
-2 That ID is sent to PHP via a cookie SESSIONADMIN_TABID
-
-3 The PHP class namespaces session data under that ID:
-
-```PHP
-$_SESSION['__sessionadmin_tabs'][<tab_uuid>]['_data']
-
-```
-4 When the tab is closed, /sessionadmin/tab-close marks it as inactive
-
-5 Debug endpoint lets you visualize or clear inactive sessions
-
-🧰 Methods Overview
-
-| Method                                   | Description                                    |
-| ---------------------------------------- | ---------------------------------------------- |
-| `set(string $key, $value): void`         | Store data for the current tab                 |
-| `get(string $key, $default = null)`      | Retrieve data for the current tab              |
-| `destroyTabSession(string $tabId): void` | Delete a tab’s session data                    |
-| `markInactiveTab(string $tabId): void`   | Mark a tab as inactive (used internally)       |
-| `debug(): array`                         | Get structured debug info for all tab sessions |
-| `getSessionKey(): string`                | Returns the internal session key used          |
-
-
-🧩 Example Integration
-
-```PHP
-<?php
-require 'vendor/autoload.php';
-
-use Seba1rx\SessionAdminServer\SessionAdminServer;
-
-// Enable debug tools locally
-define('SESSIONADMIN_DEBUG', true);
-define('SESSIONADMIN_DEBUG_UI', true);
-
-$session = new SessionAdminServer();
-
-// Set per-tab user data
-$session->set('user', ['id' => 10, 'name' => 'Sebastian']);
-echo 'Hello ' . $session->get('user')['name'];
-
-```
-
-Now each browser tab behaves independently — e.g., different users logged in simultaneously in different tabs.
-
-🧹 Optional: Tab Cleanup on Close
-
-Enable automatic cleanup by adding this before including the JS script:
-
-```html
-<script>
-window.SESSIONADMIN_AUTO_DESTROY = true;
-</script>
-
-```
-
-This triggers a POST /sessionadmin/tab-close when the user closes or reloads a tab.
-
-🧪 Debug JSON Example
-
-If you visit /sessionadmin/debug without SESSIONADMIN_DEBUG_UI, you’ll get:
-
-```json
-{
-    "package": "seba1rx/sessionadmin",
-    "version": "1.0.0",
-    "session_key": "__sessionadmin_tabs",
-    "tabs": {
-        "1af2c3b4-3ff2-49ce-8aa9-d091b2e20d0c": {
-            "active": true,
-            "last_active": "2025-10-14 17:04:18",
-            "keys": ["cart", "user"],
-            "size": 253
-        }
-    }
-}
-
-```
+`config/session.php` passes `keys: ['some_key' => 'some_value', 'foo' => 'bar']`.
+These appear at the root of `$_SESSION` alongside `sessionadmin` and `tabs` and are only
+written when the key does not yet exist.
