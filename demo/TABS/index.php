@@ -1,68 +1,45 @@
 <?php
 
-require __DIR__."/vendor/autoload.php";
-require __DIR__."/../../vendor/autoload.php";
+require __DIR__ . '/vendor/autoload.php';
+require __DIR__ . '/../../vendor/autoload.php';
 
 set_exception_handler(function (Throwable $e) {
-    $pathToFile = $e->getFile();
-    $file = $pathToFile;
-    $pos = strrpos($pathToFile, "/");
-    if ($pos !== false) {
-        $file = substr($pathToFile, $pos + 1);
-    }
-    $msg = "## " . $file . " Line: " . $e->getLine() . " ". $e->getMessage() . "\n";
-    error_log($msg);
+    $file = basename($e->getFile());
+    error_log('## ' . $file . ' Line: ' . $e->getLine() . ' ' . $e->getMessage());
 });
 
 use App\Router;
 use App\Response;
 use App\MyTABSessionAdmin;
 
+// Enable the debug UI served by bin/bootstrap.php at GET /sessionadmin/debug
 define('SESSIONADMIN_DEBUG', true);
 define('SESSIONADMIN_DEBUG_UI', true);
 
-// get the routes
-$routes = require __DIR__."/config/routes.php";
+$routes = require __DIR__ . '/config/routes.php';
+include __DIR__ . '/config/session.php';
 
-// include the session script
-include __DIR__."/config/session.php";
+// Wire up the SessionAdmin bootstrap endpoints (/sessionadmin/new-tab, /tab-close, /debug …)
+// Must run after the session is active.
+include __DIR__ . '/../../bin/bootstrap.php';
 
-/**
- * Handy fn to get the tpl path
- * * Globally scoped function
- * @return string
- */
-function tpl_dir($tpl): string
+function tpl_dir(string $tpl): string
 {
-    return __DIR__."/tpl/".$tpl;
+    return __DIR__ . '/tpl/' . $tpl;
 }
 
-/**
- * Handy fn to wrap content in a left aligned div
- * * Globally scoped function
- * @param string $content
- * @return string
- */
 function wrapInLeftAlignedDiv(string $content): string
 {
-    $wrapped = '<div style="text-align: left;">'.$content.'</div>';
-    return $wrapped;
+    return '<div style="text-align:left">' . $content . '</div>';
 }
 
-/**
- * Handy fn to get the sessionAdmin instance
- * * Globally scoped function
- * @return MyTABSessionAdmin
- */
 function sessionAdmin(): MyTABSessionAdmin
 {
     global $tab_sessionAdmin;
     return $tab_sessionAdmin;
 }
 
-// run the app
-$router = new Router($routes);
+$router   = new Router($routes);
 $response = $router->routeToAction();
 
-// send back the response
 Response::send($response);

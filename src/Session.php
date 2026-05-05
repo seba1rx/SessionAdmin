@@ -2,14 +2,11 @@
 
 namespace Seba1rx\SessionAdmin;
 
-use Seba1rx\SessionAdmin\TabManager;
 use Seba1rx\SessionAdmin\Exceptions\SessionAdminException;
 
 abstract class Session{
 
-    const IP_REGEX = '/(\d{1,3}\.\d{1,3}\.\d{1,3}\.)(\d{1,3})/';
-
-        /**
+    /**
      * array list containing the file names that will be checked in the authorization process
      *
      * @var array
@@ -38,34 +35,42 @@ abstract class Session{
     public $useAuthorization = false;
 
     /**
-     * if true will override all authorization since it only make since in MPA applications,
+     * if true will override all authorization since it only makes sense in MPA applications,
      * allowing you to implement your own way to authorize in a SPA app like using middlewares.
      *
      * @var boolean
      */
-    public $app_isSpa = true;
+    public $appIsSpa = true;
 
     /**
-     * Handy property to prevent some actions while unit testing
-     * @var boolean
-     */
-    protected $isRunningTests = false;
-
-    /**
-     * will hold the instance of the TabManager class
-     * @var TabManager
-     */
-    public $tabManager;
-
-    /**
-     * If true will use TabManager class to manage the set and get of session vars by indexing under tab Uuid
+     * if true the IP detection will consider $ipOctetsToCheck
      *
      * @var boolean
      */
-    public $useTabIndexation = true;
+    public $proxyAwareIpDetection = true;
 
     /**
-     * The secconds the session will be alive between requests
+     * the number of octets to consider when identifying the IP
+     *
+     * @var integer
+     */
+    public $ipOctetsToCheck = 2;
+
+    /**
+     * array list containing the file names that are excluded in the authorization process
+     *
+     * @var array
+     */
+    public $ignoreInAuthorization = [];
+
+    /**
+     * If true, when terminate() function is called, the request will be redirected to index
+     * @var boolean
+     */
+    public $terminateRedirects = true;
+
+    /**
+     * The seconds the session will be alive between requests
      *
      * @var integer
      */
@@ -101,36 +106,9 @@ abstract class Session{
      * used in session_set_cookie_params()
      * it is set to protected in case you want to change the value in your implementation
      *
-     * @param bool|null
+     * @var bool|null
      */
     protected $secure = NULL;
-
-    /**
-     * if true the IP detection will consider $ipOctetsToCheck
-     *
-     * @var boolean
-     */
-    public $proxyAwareIpDetection = true;
-
-    /**
-     * the number of octates to consider when identifying the IP
-     *
-     * @var integer
-     */
-    public $ipOctetsToCheck = 2;
-
-    /**
-     * array list containing the file names that are excluded in the authorization process
-     *
-     * @var array
-     */
-    public $ignoreInAuthorization = [];
-
-    /**
-     * If true, when terminate() function is called, the request will be redirected to index
-     * @var boolean
-     */
-    public $terminateRedirects = true;
 
 
     /**
@@ -140,18 +118,7 @@ abstract class Session{
     */
     protected function currentStateIsUser(): bool
     {
-        // empty() automatically returns false if the key doesn’t exist and the value is falsy
         return !empty($_SESSION['sessionadmin']['isUser']);
-    }
-
-    /**
-     * Sets the TabManager instance
-     *
-     * @return void
-     */
-    protected function setTabManager(): void
-    {
-        $this->tabManager = new TabManager();
     }
 
     /**
@@ -161,13 +128,12 @@ abstract class Session{
      */
     protected function configureGuestSession(): void
     {
-        // setting / resetting session
         $_SESSION = [];
         $_SESSION['sessionadmin'] = [];
         $_SESSION['sessionadmin']['isUser'] = FALSE;
         $_SESSION['sessionadmin']['msg'] = 'you are a guest';
         $_SESSION['sessionadmin']['allowedUrl'] = $this->allowedUrls;
-        $_SESSION['sessionadmin']['urlIsAllowedToLoad'] = FALSE; // by default
+        $_SESSION['sessionadmin']['urlIsAllowedToLoad'] = FALSE;
     }
 
     /**
@@ -178,27 +144,30 @@ abstract class Session{
      */
     protected function preparesDomainAndSecureVars(): void
     {
-        $this->domain = $this->domain ?? $_SERVER['SERVER_NAME'];
-        $this->secure = $this->secure ?? isset($_SERVER['HTTPS']);
+        $this->domain ??= $_SERVER['SERVER_NAME'];
+        $this->secure ??= isset($_SERVER['HTTPS']);
     }
 
     /**
-     * Updates the available session time
+     * Updates the session cookie lifetime and configures cookie parameters before session start.
+     *
+     * Refreshes the cookie expiry on every request so active users are not logged out.
+     * Cookie params (lifetime, path, domain, secure, httponly) are only set before
+     * the session is started; calling session_set_cookie_params() after session_start()
+     * has no effect.
      *
      * @return void
      */
     protected function setSessionTime(): void
     {
-        // refresh expire time of session
-        if (isset($_COOKIE[$this->sessionName])){
-            setcookie($this->sessionName, $_COOKIE[$this->sessionName], time() + $this->sessionLifetime, "/");
+        if (isset($_COOKIE[$this->sessionName])) {
+            $this->setCookie($this->sessionName, $_COOKIE[$this->sessionName], time() + $this->sessionLifetime, '/');
         }
 
-        // sets expire time (when creating session only)
-        if(!isset($_SESSION)) {
+        if (session_status() !== PHP_SESSION_ACTIVE) {
             $this->preparesDomainAndSecureVars();
             session_set_cookie_params($this->sessionLifetime, $this->path, $this->domain, $this->secure, true);
-            ini_set('session.gc_maxlifetime',(string)$this->sessionLifetime);
+            ini_set('session.gc_maxlifetime', (string)$this->sessionLifetime);
         }
     }
 
@@ -230,9 +199,8 @@ abstract class Session{
     }
 
     /**
-     * Checks if url that originated the request is in allowd URL array
-     * This check is done when an url is requested or when an XHR request is sent to the server
-     * This evaluation only marks TRUE when allowed, FALSE by default
+     * Checks if url that originated the request is in allowed URL array.
+     * Uses SCRIPT_NAME (not PHP_SELF) to avoid PATH_INFO manipulation.
      *
      * @return void
      * @throws SessionAdminException
@@ -241,7 +209,7 @@ abstract class Session{
     {
         if(empty($_SESSION['sessionadmin']['allowedUrl'])) throw new SessionAdminException("the allowedUrl key is empty");
         $_SESSION['sessionadmin']['urlIsAllowedToLoad'] = FALSE;
-        $url_to_check = basename($_SERVER['PHP_SELF']);
+        $url_to_check = basename($_SERVER['SCRIPT_NAME'] ?? $_SERVER['PHP_SELF'] ?? '');
 
         if(in_array($url_to_check, $this->ignoreInAuthorization)){
             return;
@@ -256,60 +224,57 @@ abstract class Session{
         }
         if(!$_SESSION['sessionadmin']['urlIsAllowedToLoad'] && $this->useAuthorization){
             $this->redirectToIndex();
-            // header('Location: index.php');
         }
     }
 
     /**
      * Checks if request is valid or a hijacking attempt
      *
-     * @return bool true if hijicking detected, false for a valid request
+     * @return bool true if hijacking detected, false for a valid request
      */
     protected function requestIsHijackingAttempt(): bool
     {
         if($this->proxyAwareIpDetection){
-            $ipAddress = $this->getIpAddress_proxyAware();
+            $ipAddress = $this->getIpAddressProxyAware();
         }else{
-            $ipAddress = $this->getIpAddress_noProxys();
+            $ipAddress = $this->getIpAddressNoProxies();
         }
         $userAgent = $this->getUserAgent();
 
-        // Build IP prefix based on configuration
-        if($this->ipOctetsToCheck < 2 && $this->ipOctetsToCheck > 4){
-            throw new SessionAdminException("Ip octates to check must be in the 2 to 4 range");
+        if ($this->ipOctetsToCheck < 2 || $this->ipOctetsToCheck > 4) {
+            throw new SessionAdminException("Ip octets to check must be in the 2 to 4 range");
         }
         $ipPrefix = $this->getIpPrefix($ipAddress, $this->ipOctetsToCheck);
 
         if (!isset($_SESSION['sessionadmin']['ipPrefix'], $_SESSION['sessionadmin']['userAgent'])) {
             $_SESSION['sessionadmin']['ipPrefix'] = $ipPrefix;
             $_SESSION['sessionadmin']['userAgent'] = $userAgent;
-            return false; // first request → not hijacking
+            return false;
         }
 
         if ($_SESSION['sessionadmin']['ipPrefix'] !== $ipPrefix) {
-            return true; // possible hijacking
+            return true;
         }
 
         if ($_SESSION['sessionadmin']['userAgent'] !== $userAgent) {
-            return true; // possible hijacking
+            return true;
         }
 
-        return false; // looks safe
+        return false;
     }
 
     /**
-     * Obtains the full IP in a web server behind a proxy.
+     * Obtains the client IP in a web server behind a proxy.
      * Use this if your app is behind Cloudflare, Nginx, Apache mod_proxy,
      * AWS ELB, etc. and you want the real client IP.
      *
-     * * Checks common proxy headers in order.
-     * * Handles comma-separated lists (X-Forwarded-For).
-     * * Validates IPs and skips private/reserved ranges (so attackers can’t inject 127.0.0.1).
-     * * Falls back to REMOTE_ADDR
+     * Checks common proxy headers in order and handles comma-separated lists (X-Forwarded-For).
+     * Validates IP format only — does NOT filter private/reserved ranges.
+     * Falls back to REMOTE_ADDR if no valid IP is found in proxy headers.
      *
      * @return string
      */
-    protected function getIpAddress_proxyAware(): string
+    protected function getIpAddressProxyAware(): string
     {
         $keys = [
             'HTTP_CLIENT_IP',
@@ -323,7 +288,6 @@ abstract class Session{
 
         foreach ($keys as $key) {
             if (!empty($_SERVER[$key])) {
-                // Handle multiple IPs (first = client, rest = proxies)
                 $ipList = explode(',', $_SERVER[$key]);
                 foreach ($ipList as $ip) {
                     $ip = trim($ip);
@@ -338,23 +302,20 @@ abstract class Session{
     }
 
     /**
-     * Obtains the ip address in a web server that does not uses a proxy/load balancer
+     * Obtains the ip address in a web server that does not use a proxy/load balancer.
      *
-     * Use this if your app runs directly on a server and you don’t trust
-     * proxy headers (e.g., a VPS without Cloudflare or load balancer)
-     *
-     * * attacker cannot spoof it
-     * * if your app sits behind a reverse proxy/load balancer this will only give you the proxy’s IP
+     * Use this if your app runs directly on a server and you don't trust
+     * proxy headers (e.g., a VPS without Cloudflare or load balancer).
      *
      * @return string
      */
-    protected function getIpAddress_noProxys(): string
+    protected function getIpAddressNoProxies(): string
     {
         return $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
     }
 
     /**
-     * Obtains the first 2, 3 or 4 octates from the ip accordind to ipOctetsToCheck
+     * Obtains the first 2, 3 or 4 octets from the ip according to ipOctetsToCheck
      *
      * @param string $ip
      * @param integer $parts
@@ -372,7 +333,7 @@ abstract class Session{
             return implode(':', array_slice($chunks, 0, $parts));
         }
 
-        return $ip; // fallback if invalid
+        return $ip;
     }
 
     /**
@@ -392,14 +353,11 @@ abstract class Session{
      */
     protected function regenerateSession(): void
     {
-        // Create new session without destroying the old one
         session_regenerate_id(false);
 
-        // Grab current session ID and close both sessions to allow other scripts to use them
         $session_id = session_id();
         session_write_close();
 
-        // Set session ID to the new one, and start it back up again
         session_id($session_id);
         session_start();
     }
@@ -415,53 +373,34 @@ abstract class Session{
     }
 
     /**
-     * Gets the substring after the last occurence of the needle
-     * e.g., getSubStrAfterLast('dot.separated.string.parts', '.') -> returns 'parts'
+     * Returns the substring after the last occurrence of needle in haystack.
+     *
+     * e.g., getSubStrAfterLast('dot.separated.string.parts', '.') → 'parts'
+     * Returns the original string unchanged if needle is not found.
      *
      * @param string $haystack
      * @param string $needle
      * @return string
      */
-    protected function getSubStrAfterLast (string $haystack, string $needle): string
+    protected function getSubStrAfterLast(string $haystack, string $needle): string
     {
-        if (!is_bool($this->strrevpos($haystack, $needle))){
-            return substr($haystack, $this->strrevpos($haystack, $needle)+strlen($needle));
-        }else{
-            return $haystack;
-        }
-    }
-
-    /**
-     * Use strrevpos function in case your php version does not include it
-     *
-     * @param string $haystack
-     * @param string $needle
-     * @return mixed
-     */
-    protected function strrevpos(string $haystack, string $needle): mixed
-    {
-        $rev_pos = strpos (strrev($haystack), strrev($needle));
-        if($rev_pos===false){
-            return false;
-        }else{
-            return strlen($haystack) - $rev_pos - strlen($needle);
-        }
+        $pos = strrpos($haystack, $needle);
+        return $pos !== false ? substr($haystack, $pos + strlen($needle)) : $haystack;
     }
 
     /**
      * Redirects the current request to index.php.
      * Handles normal browser requests, XHR/fetch calls, and preserves original URI.
      *
-     * * requires that the script request sender (e.g. jquery ajax) implements a handler to redirect to the intended page
+     * Override this method in subclasses (e.g., test fixtures) to intercept the redirect
+     * without triggering headers or exit().
      *
      * @return void
      */
     protected function redirectToIndex(): void
     {
-        // Target file
         $url = '/index.php';
 
-        // Detect request type
         $requestedWith = $_SERVER['HTTP_X_REQUESTED_WITH'] ?? '';
         $accept = $_SERVER['HTTP_ACCEPT'] ?? '';
         $isXhrOrFetch = false;
@@ -474,22 +413,17 @@ abstract class Session{
             $isXhrOrFetch = true;
         }
 
-        // Decide HTTP status code
         $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
         if ($method === 'POST' || $method === 'PUT' || $method === 'DELETE') {
-            // Preserve method → use 307
             $status = 307;
         } else {
-            // Safe GET redirect
             $status = 303;
         }
 
-        // Always send Location header
         if (!headers_sent()) {
             header("Location: {$url}", true, $status);
         }
 
-        // XHR/fetch requests → return JSON + custom header
         if ($isXhrOrFetch) {
             if (!headers_sent()) {
                 header('Content-Type: application/json; charset=utf-8', true, $status);
@@ -499,7 +433,6 @@ abstract class Session{
             exit;
         }
 
-        // Fallback HTML (for non-JS browsers)
         if (!headers_sent()) {
             header('Content-Type: text/html; charset=utf-8', true, $status);
         }
@@ -514,32 +447,18 @@ abstract class Session{
     /**
      * Wrapper for PHP's native setcookie() function.
      *
-     * This method exists to make cookie management testable in unit tests
-     * without invoking actual HTTP headers. It mirrors the native PHP
-     * setcookie() signature and behavior as closely as possible.
+     * Override this method in test subclasses to intercept cookie writes
+     * without sending real HTTP headers.
      *
-     * @param string $name     The name of the cookie.
-     * @param string $value    The value of the cookie. An empty string will delete the cookie.
+     * @param string $name
+     * @param string $value
      * @param int|string|array $expiresOrOptions
-     *        - If an int, it is interpreted as a Unix timestamp for expiration.
-     *        - If a string, it will be parsed as a date/time for expiration.
-     *        - If an array, it must match the PHP 7.3+ options format, e.g.:
-     *          [
-     *              'expires'  => time() + 3600,
-     *              'path'     => '/',
-     *              'domain'   => '',
-     *              'secure'   => true,
-     *              'httponly' => true,
-     *              'samesite' => 'Lax'
-     *          ]
-     * @param string $path     Optional. The path on the server in which the cookie will be available.
-     * @param string $domain   Optional. The (sub)domain the cookie is available to.
-     * @param bool   $secure   Optional. Indicates that the cookie should only be transmitted over HTTPS.
-     * @param bool   $httponly Optional. When true, the cookie will be made accessible only through the HTTP protocol.
+     * @param string $path
+     * @param string $domain
+     * @param bool   $secure
+     * @param bool   $httponly
      *
-     * @return bool Returns true on success or false on failure, just like native setcookie().
-     *
-     * @see https://www.php.net/manual/en/function.setcookie.php
+     * @return bool
      */
     protected function setCookie(
         string $name,
@@ -550,19 +469,6 @@ abstract class Session{
         bool $secure = false,
         bool $httponly = false
     ): bool {
-        // Allow unit test override: if a mock method exists, use it.
-        if (method_exists($this, 'mockSetCookie')) {
-            return $this->mockSetCookie(
-                $name,
-                $value,
-                $expiresOrOptions,
-                $path,
-                $domain,
-                $secure,
-                $httponly
-            );
-        }
-
         return setcookie(
             $name,
             $value,
@@ -577,36 +483,16 @@ abstract class Session{
     /**
      * Wrapper for accessing cookie values from the $_COOKIE superglobal.
      *
-     * This method exists to make cookie reads testable in unit tests,
-     * providing a single point of access to cookie data. During testing,
-     * you can override or mock this method to simulate cookie states
-     * without modifying global variables.
+     * Override this method in test subclasses to read from an in-memory
+     * cookie store instead of the real superglobal.
      *
-     * @param string $name     The name of the cookie to retrieve.
-     * @param mixed  $default  Optional. The default value to return if the cookie is not set.
+     * @param string $name
+     * @param mixed  $default
      *
-     * @return mixed Returns the cookie value if it exists, otherwise the default value.
-     *
-     * @see https://www.php.net/manual/en/reserved.variables.cookies.php
+     * @return mixed
      */
     protected function getCookie(string $name, mixed $default = null): mixed
     {
-        // Allow unit test override
-        if (method_exists($this, 'mockGetCookie')) {
-            return $this->mockGetCookie($name, $default);
-        }
-
         return $_COOKIE[$name] ?? $default;
     }
-
-    /**
-     * called from unit tests
-     *
-     * @codeCoverageIgnore
-     */
-    protected function setIsRunningTests(bool $isRunningTest = true): void
-    {
-        $this->isRunningTests = $isRunningTest;
-    }
 }
-

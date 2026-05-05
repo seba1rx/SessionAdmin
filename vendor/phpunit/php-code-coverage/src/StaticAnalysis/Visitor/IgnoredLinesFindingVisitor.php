@@ -23,6 +23,8 @@ use PhpParser\NodeVisitorAbstract;
 
 /**
  * @internal This class is not covered by the backward compatibility promise for phpunit/php-code-coverage
+ *
+ * @no-named-arguments Parameter names are not covered by the backward compatibility promise for phpunit/php-code-coverage
  */
 final class IgnoredLinesFindingVisitor extends NodeVisitorAbstract
 {
@@ -55,9 +57,16 @@ final class IgnoredLinesFindingVisitor extends NodeVisitorAbstract
             return null;
         }
 
+        if ($node instanceof Interface_) {
+            for ($line = $node->getStartLine(); $line <= $node->getEndLine(); $line++) {
+                $this->ignoredLines[] = $line;
+            }
+
+            return null;
+        }
+
         if ($node instanceof Class_ ||
             $node instanceof Trait_ ||
-            $node instanceof Interface_ ||
             $node instanceof Attribute) {
             $this->ignoredLines[] = $node->getStartLine();
 
@@ -68,10 +77,6 @@ final class IgnoredLinesFindingVisitor extends NodeVisitorAbstract
         }
 
         if (!$this->useAnnotationsForIgnoringCode) {
-            return null;
-        }
-
-        if ($node instanceof Interface_) {
             return null;
         }
 

@@ -1,123 +1,159 @@
 /**
  * SessionAdminClient
  *
- * This script ensures that each browser tab has its own unique ID and
- * that this ID is also sent to the backend through a cookie.
+ * Ensures every browser tab has a stable UUID and keeps the server
+ * informed about tab lifecycle events (open / close).
  *
- * Move this file to your assets directory and include it in your main HTML file:
- * <script src="/assets/seba1rx_sessionadmin.js"></script>
+ * Include in your HTML:
+ *   <script src="/assets/seba1rx_sessionAdmin.js"></script>
+ *
+ * Optional window flags (set BEFORE the script loads):
+ *   window.SESSIONADMIN_AUTO_DESTROY = true;  // notify server on tab close (beforeunload)
+ *   window.SESSIONADMIN_DEBUG        = true;  // enable console logging
+ *
+ * The tab UUID is available in PHP on every request as:
+ *   $_COOKIE['SESSIONADMIN_TABID']
  */
 const SessionAdminClient = {
-    /**
-     * Tab Uuid
-     * Tool to set an id to each tab.
-     * This per-tab UUID mechanism lets you isolate session data and
-     * prevents state bleed between tabs.
-     *
-     * Usage:
-     * to assign the id to the tab just do:
-     * * SessionAdminClient.tab.assignTabUuid();
-     *
-     * if you ever need to get the id just do:
-     * * SessionAdminClient.tab.id;
-     *
-     * In the backend you will be able to get this id on each request as:
-     * * $_COOKIE['session_tab_id'] (PHP example)
-     */
+
     tab: {
-        /**
-         * Tab unique identifier
-         * @type {string|null}
-         */
+        /** @type {string|null} Current tab UUID */
         id: null,
+
+        /** @type {boolean} True when the UUID was generated this session (vs. restored from storage) */
+        isNew: false,
+
         /**
-         * Generates a UUID v4-like identifier
+         * Generates a cryptographically random UUIDv4 using the Web Crypto API.
+         * crypto.randomUUID() is available in all modern browsers (Chrome 92+, Firefox 95+, Safari 15.4+).
+         *
          * @returns {string}
          */
-        generateUuid: () => {
-            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-                const r = Math.random() * 16 | 0;
-                const v = c === 'x' ? r : (r & 0x3 | 0x8);
-                return v.toString(16);
-            });
-        },
+        generateUuid: () => crypto.randomUUID(),
+
         /**
-         * Assigns or retrieves the tab UUID.
-         * Called automatically on script load.
+         * Resolves the tab UUID using sessionStorage only:
+         *  1. sessionStorage  — persists within the tab, cleared when tab closes
+         *  2. generate new    — fresh tab, no prior UUID found
+         *
+         * Sets tab.isNew = true only when a UUID is generated for the first time.
+         *
+         * Note: 'unique-tab-id' is the browser-side storage key (internal to this script).
+         * The server-facing name is the cookie 'SESSIONADMIN_TABID', set separately in init().
+         *
+         * window.name is intentionally NOT used as a fallback: it persists across same-tab
+         * navigations to different origins, making it readable/writable by other sites.
          */
         assignTabUuid: () => {
-            let uid = window.sessionStorage.getItem('unique-tab-id');
+            const STORAGE_KEY = 'unique-tab-id';
+            const stored = window.sessionStorage.getItem(STORAGE_KEY);
+            const isNew  = !stored;
 
-            // Generate a new one if missing or window.name is not set
-            if (!uid || !window.name) {
-                uid = SessionAdminClient.tab.generateUuid();
-                window.sessionStorage.setItem('unique-tab-id', uid);
-                window.name = uid;
-            }
+            const uid = isNew ? SessionAdminClient.tab.generateUuid() : stored;
 
-            // Sync both sources
-            SessionAdminClient.tab.id = uid;
-            window.name = uid;
+            window.sessionStorage.setItem(STORAGE_KEY, uid);
+            SessionAdminClient.tab.id    = uid;
+            SessionAdminClient.tab.isNew = isNew;
         },
     },
-    /**
-     * Cookie utilities
-     */
+
     cookie: {
         /**
-         * Sets a cookie.
          * @param {string} name
          * @param {string} value
-         * @param {number} days Expiration in days (optional)
+         * @param {number} [days=1]
          */
         set: (name, value, days = 1) => {
-            const expires = new Date();
-            expires.setTime(expires.getTime() + (days * 24 * 60 * 60 * 1000));
-            document.cookie = `${encodeURIComponent(name)}=${encodeURIComponent(value)}; expires=${expires.toUTCString()}; path=/; SameSite=Lax`;
+            const expires = new Date(Date.now() + days * 864e5);
+            document.cookie =
+                `${encodeURIComponent(name)}=${encodeURIComponent(value)}` +
+                `; expires=${expires.toUTCString()}; path=/; SameSite=Lax`;
         },
 
-        /**
-         * Reads a cookie value by name.
-         * @param {string} name
-         * @returns {string|null}
-         */
+        /** @returns {string|null} */
         get: (name) => {
-            const match = document.cookie.match(new RegExp('(^| )' + encodeURIComponent(name) + '=([^;]+)'));
-            return match ? decodeURIComponent(match[2]) : null;
-        }
+            const m = document.cookie.match(
+                new RegExp('(^| )' + encodeURIComponent(name) + '=([^;]+)')
+            );
+            return m ? decodeURIComponent(m[2]) : null;
+        },
     },
-    notifyTabClosed: () => {
-        try {
-            const url = '/sessionadmin/tab-close'; // endpoint in your backend
-            const data = { tab_id: SessionAdminClient.tab.id };
-            navigator.sendBeacon(url, JSON.stringify(data));
-        } catch (e) {
-            console.warn('[SessionAdminClient] Could not send tab close event:', e);
-        }
-    },
+
     /**
-     * Initializes the session admin client:
-     * - Assigns tab UUID
-     * - Sets the identifying cookie
+     * Sends a JSON payload via sendBeacon with the correct Content-Type.
+     * Beacon fires-and-forgets — the response is intentionally ignored.
+     *
+     * @param {string} url
+     * @param {object} data
+     */
+    _beacon: (url, data) => {
+        try {
+            navigator.sendBeacon(
+                url,
+                new Blob([JSON.stringify(data)], { type: 'application/json' })
+            );
+        } catch (e) {
+            console.warn('[SessionAdminClient] Beacon failed for', url, e);
+        }
+    },
+
+    /** Notifies the server that this tab has been opened / is active. */
+    notifyNewTab: () => {
+        SessionAdminClient._beacon('/sessionadmin/new-tab', {
+            tab_id: SessionAdminClient.tab.id,
+        });
+    },
+
+    /** Notifies the server that this tab is closing (beforeunload). */
+    notifyTabClosed: () => {
+        SessionAdminClient._beacon('/sessionadmin/tab-close', {
+            tab_id: SessionAdminClient.tab.id,
+        });
+    },
+
+    /**
+     * Bootstraps the client:
+     *  - resolves / generates the tab UUID (sessionStorage only)
+     *  - syncs the SESSIONADMIN_TABID cookie
+     *  - notifies the server when the tab is genuinely new (not on every refresh)
+     *  - registers the beforeunload handler when SESSIONADMIN_AUTO_DESTROY === true
      */
     init: () => {
         SessionAdminClient.tab.assignTabUuid();
-        const tabId = SessionAdminClient.tab.id;
-        const cookieName = 'session_tab_id';
-        const currentCookie = SessionAdminClient.cookie.get(cookieName);
 
-        if (currentCookie !== tabId) {
-            SessionAdminClient.cookie.set(cookieName, tabId);
+        const tabId  = SessionAdminClient.tab.id;
+        const COOKIE = 'SESSIONADMIN_TABID';
+        const prev   = SessionAdminClient.cookie.get(COOKIE);
+
+        // Keep the cookie in sync with sessionStorage
+        if (prev !== tabId) {
+            SessionAdminClient.cookie.set(COOKIE, tabId);
         }
 
-        // Notify backend softly when tab is closing
-        window.addEventListener('beforeunload', () => {
-            SessionAdminClient.notifyTabClosed();
-        });
+        // Notify the server only when the tab is new or the cookie was stale.
+        // Skips the network call on plain page refreshes.
+        if (SessionAdminClient.tab.isNew || prev !== tabId) {
+            SessionAdminClient.notifyNewTab();
+        }
 
-        console.log('[SessionAdminClient] Tab UUID:', tabId);
-    }
+        // Register close notification only when explicitly enabled
+        if (window.SESSIONADMIN_AUTO_DESTROY === true) {
+            window.addEventListener('beforeunload', SessionAdminClient.notifyTabClosed);
+        }
+
+        if (window.SESSIONADMIN_DEBUG) {
+            console.log(
+                '[SessionAdminClient] Tab UUID:', tabId,
+                SessionAdminClient.tab.isNew ? '(new)' : '(existing)'
+            );
+        }
+    },
 };
 
-// Run automatically on load
-document.addEventListener('DOMContentLoaded', SessionAdminClient.init);
+// Guard against the script loading after DOMContentLoaded has already fired
+// (e.g. when placed at end of <body> or loaded with defer).
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', SessionAdminClient.init);
+} else {
+    SessionAdminClient.init();
+}

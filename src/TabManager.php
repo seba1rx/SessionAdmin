@@ -1,136 +1,214 @@
 <?php
+
 namespace Seba1rx\SessionAdmin;
 
-use Seba1rx\SessionAdmin\Exceptions\SessionAdminException;
+use Seba1rx\SessionAdmin\Contracts\TabStorageInterface;
 
 /**
- * SessionAdminServer
- * Provides per-tab session isolation using a browser cookie and JS client
+ * Provides per-tab session isolation using a browser cookie and a JS client.
+ *
+ * Data is stored under $_SESSION[$sessionKey][$tabId] where $tabId is a UUIDv4
+ * read from the SESSIONADMIN_TABID cookie set by seba1rx_sessionAdmin.js.
+ *
+ * Implements TabStorageInterface so consumers can type-hint the contract
+ * without depending on the concrete class.
  */
-class TabManager
+class TabManager implements TabStorageInterface
 {
+    /**
+     * Key used as the root index in $_SESSION for all tab data.
+     *
+     * @var string
+     */
     protected string $sessionKey = 'tabs';
 
-    public function __construct()
+    /**
+     * Initialises the tab storage bucket in $_SESSION if not already present.
+     *
+     * @param bool $autoIndex When true, the tab identified by the SESSIONADMIN_TABID
+     *                        cookie is automatically indexed if not already present.
+     *                        Useful when the application wants to guarantee the current
+     *                        tab has an entry without waiting for the JS client to call
+     *                        the new-tab endpoint.
+     */
+    public function __construct(bool $autoIndex = false)
     {
-        error_log("## tab manager: construct");
         if (!isset($_SESSION[$this->sessionKey])) {
             $_SESSION[$this->sessionKey] = [];
+        }
+
+        if ($autoIndex) {
+            $tabId = $this->getTabId();
+            if ($tabId !== null) {
+                $this->indexNewTab($tabId);
+            }
         }
     }
 
     /**
-     * Creates the tab id index in the tabs index in the $_SESSION array
+     * Creates the session entry for the given tab ID if it does not already exist.
      *
-     * @param string $tabId
+     * @param string $tabId UUIDv4 identifying the browser tab.
      * @return void
      */
     public function indexNewTab(string $tabId): void
     {
-        error_log("## tab manager: adding new tab index: {$tabId}");
         if (!isset($_SESSION[$this->sessionKey][$tabId])) {
-            $_SESSION[$this->sessionKey]['sessionadmin'] = [];
-            $_SESSION[$this->sessionKey]['sessionadmin'][$tabId] = [];
-            // $tabId = $this->getTabId();
-            // if (!$tabId) return;
-
-            $_SESSION[$this->sessionKey]['sessionadmin'][$tabId]['data'] = [];
-            $_SESSION[$this->sessionKey]['sessionadmin'][$tabId]['is_active'] = true;
-            $_SESSION[$this->sessionKey]['sessionadmin'][$tabId]['last_active'] = time();
-
-            error_log("## tab manager: items: " . json_encode($_SESSION[$this->sessionKey]));
+            $_SESSION[$this->sessionKey][$tabId] = [
+                'data'        => [],
+                'is_active'   => true,
+                'last_active' => time(),
+            ];
         }
     }
 
     /**
-     * Get current tab ID from cookie
+     * Returns the current tab ID from the SESSIONADMIN_TABID cookie.
+     *
+     * Returns null if the cookie is absent or does not contain a valid UUIDv4.
      *
      * @return string|null
      */
     protected function getTabId(): ?string
     {
-        return $_COOKIE['SESSIONADMIN_TABID'] ?? null;
+        $tabId = $_COOKIE['SESSIONADMIN_TABID'] ?? null;
+        if ($tabId === null) {
+            return null;
+        }
+        return $this->isValidUuid($tabId) ? $tabId : null;
     }
 
     /**
-     * Set session data for this tab
+     * Returns true if the given tab ID has an entry in the session store.
+     *
+     * When $tabId is null the method resolves the current tab ID from the
+     * SESSIONADMIN_TABID cookie. Returns false when no valid UUID is found.
+     *
+     * @param string|null $tabId UUIDv4 to check; null resolves to the current cookie.
+     * @return bool
+     */
+    public function isTabIndexed(?string $tabId = null): bool
+    {
+        $id = $tabId ?? $this->getTabId();
+        if ($id === null) {
+            return false;
+        }
+        return isset($_SESSION[$this->sessionKey][$id]);
+    }
+
+    /**
+     * Stores a key/value pair in the current tab's session data.
+     *
+     * Auto-initialises the tab entry if not yet indexed.
+     * Does nothing when no valid tab ID cookie is present.
      *
      * @param string $key
-     * @param mixed $value
+     * @param mixed  $value
      * @return void
      */
     public function set(string $key, mixed $value): void
     {
         $tabId = $this->getTabId();
-        if (!$tabId) return;
+        if (!$tabId) {
+            return;
+        }
 
-        $_SESSION[$this->sessionKey]['sessionadmin'][$tabId]['data'][$key] = $value;
-        $_SESSION[$this->sessionKey]['sessionadmin'][$tabId]['is_active'] = true;
-        $_SESSION[$this->sessionKey]['sessionadmin'][$tabId]['last_active'] = time();
+        $this->indexNewTab($tabId);
+
+        $_SESSION[$this->sessionKey][$tabId]['data'][$key]    = $value;
+        $_SESSION[$this->sessionKey][$tabId]['is_active']      = true;
+        $_SESSION[$this->sessionKey][$tabId]['last_active']    = time();
     }
 
     /**
-     * Get session data for this tab
+     * Retrieves a value from the current tab's session data.
      *
      * @param string $key
-     * @param mixed $default
-     *
+     * @param mixed  $default Returned when the key is absent or no valid tab ID is found.
      * @return mixed
      */
     public function get(string $key, mixed $default = null): mixed
     {
         $tabId = $this->getTabId();
-        return $_SESSION[$this->sessionKey]['sessionadmin'][$tabId]['data'][$key] ?? $default;
+        if (!$tabId) {
+            return $default;
+        }
+        return $_SESSION[$this->sessionKey][$tabId]['data'][$key] ?? $default;
     }
 
     /**
-     * Destroy all session data for a given tab
+     * Removes all session data for the given tab.
      *
      * @param string $tabId
      * @return void
      */
     public function destroyTabSession(string $tabId): void
     {
-        if (isset($_SESSION[$this->sessionKey]['sessionadmin'][$tabId])) {
-            unset($_SESSION[$this->sessionKey]['sessionadmin'][$tabId]);
-        }
+        unset($_SESSION[$this->sessionKey][$tabId]);
     }
 
     /**
-     * Mark a tab as inactive (used on beforeunload)
+     * Marks a tab as inactive (used when the browser tab fires the beforeunload event).
      *
      * @param string $tabId
      * @return void
      */
     public function markInactiveTab(string $tabId): void
     {
-        if (isset($_SESSION[$this->sessionKey]['sessionadmin'][$tabId])) {
-            $_SESSION[$this->sessionKey]['sessionadmin'][$tabId]['is_active'] = false;
+        if (isset($_SESSION[$this->sessionKey][$tabId])) {
+            $_SESSION[$this->sessionKey][$tabId]['is_active'] = false;
         }
     }
 
     /**
-     * Return all tab session data for debugging
+     * Removes tab entries that have been inactive for longer than the given threshold.
      *
-     * @return array
+     * Useful for preventing session bloat in apps where users frequently open new tabs.
+     * Only tabs with is_active === false AND last_active older than $olderThanSeconds are removed.
+     * Active tabs are never touched.
+     *
+     * @param int $olderThanSeconds Remove inactive tabs not seen for at least this many seconds.
+     * @return int Number of tabs removed.
+     */
+    public function cleanupInactiveTabs(int $olderThanSeconds): int
+    {
+        $cutoff  = time() - $olderThanSeconds;
+        $removed = 0;
+
+        foreach ($_SESSION[$this->sessionKey] ?? [] as $tabId => $data) {
+            if (
+                !($data['is_active'] ?? true) &&
+                ($data['last_active'] ?? PHP_INT_MAX) < $cutoff
+            ) {
+                unset($_SESSION[$this->sessionKey][$tabId]);
+                $removed++;
+            }
+        }
+
+        return $removed;
+    }
+
+    /**
+     * Returns a summary of all tracked tabs, useful for debugging.
+     *
+     * @return array<string, array{is_active: bool, last_active: string, keys: string[], size: int}>
      */
     public function debug(): array
     {
         $result = [];
-        foreach ($_SESSION[$this->sessionKey]['sessionadmin'] ?? [] as $tabId => $data) {
+        foreach ($_SESSION[$this->sessionKey] ?? [] as $tabId => $data) {
             $result[$tabId] = [
-                'is_active' => $data['is_active'] ?? false,
+                'is_active'   => $data['is_active'] ?? false,
                 'last_active' => date('Y-m-d H:i:s', $data['last_active'] ?? 0),
-                'keys' => isset($data['data']) ? array_keys($data['data']) : [],
-                'size' => isset($data['data']) ? strlen(json_encode($data['data'])) : 0,
+                'keys'        => isset($data['data']) ? array_keys($data['data']) : [],
+                'size'        => isset($data['data']) ? \strlen(\json_encode($data['data'])) : 0,
             ];
         }
-
         return $result;
     }
 
     /**
-     * Gets the key used to index the tabs
+     * Returns the session key used as the root index for tab data.
      *
      * @return string
      */
@@ -140,22 +218,19 @@ class TabManager
     }
 
     /**
-     * Generates a UUID v4 (format: 8-4-4-4-12, example: 6ff19a11-97cb-4060-b68f-3b81836ec5f0)
+     * Generates a RFC 4122 compliant UUIDv4.
      *
-     * @return string UUID v4 lowercase
-     * @throws SessionAdminException
+     * @return string Lowercase UUID, e.g. '6ff19a11-97cb-4060-b68f-3b81836ec5f0'
+     * @throws \Exception If random_bytes() fails to generate sufficient entropy.
      */
-    function uuid_v4(): string {
+    public function generateUuid(): string
+    {
         $data = random_bytes(16);
 
-        // Adjust the version to  0100 (v4)
-        $data[6] = chr((ord($data[6]) & 0x0f) | 0x40);
+        $data[6] = \chr(\ord($data[6]) & 0x0f | 0x40);
+        $data[8] = \chr(\ord($data[8]) & 0x3f | 0x80);
 
-        // Adjust the variation to 10xx (RFC 4122)
-        $data[8] = chr((ord($data[8]) & 0x3f) | 0x80);
-
-        // Format as hexadecimal string
-        return sprintf(
+        return \sprintf(
             '%08s-%04s-%04s-%04s-%012s',
             bin2hex(substr($data, 0, 4)),
             bin2hex(substr($data, 4, 2)),
@@ -166,18 +241,18 @@ class TabManager
     }
 
     /**
-     * Validates if a string is indeed a UUID (v1..v5)
+     * Validates whether a string is a well-formed UUID.
      *
      * @param string $uuid
-     * @param bool $onlyV4
+     * @param bool   $onlyV4 When true (default), only UUIDv4 is accepted.
      * @return bool
      */
-    function is_valid_uuid(string $uuid, bool $onlyV4 = true): bool {
+    public function isValidUuid(string $uuid, bool $onlyV4 = true): bool
+    {
         $pattern = $onlyV4
             ? '/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i'
             : '/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i';
 
         return (bool) preg_match($pattern, $uuid);
     }
-
 }

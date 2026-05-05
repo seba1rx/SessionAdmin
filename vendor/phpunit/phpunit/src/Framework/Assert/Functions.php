@@ -9,10 +9,12 @@
  */
 namespace PHPUnit\Framework;
 
+use const PHP_EOL;
 use function func_get_args;
 use function function_exists;
 use ArrayAccess;
 use Countable;
+use PHPUnit\Event\Facade as EventFacade;
 use PHPUnit\Framework\Constraint\ArrayHasKey;
 use PHPUnit\Framework\Constraint\Callback;
 use PHPUnit\Framework\Constraint\Constraint;
@@ -201,6 +203,176 @@ if (!function_exists('PHPUnit\Framework\assertIsList')) {
     }
 }
 
+if (!function_exists('PHPUnit\Framework\assertArraysAreIdentical')) {
+    /**
+     * Assert that two arrays are identical.
+     *
+     * The (key, value) relationship matters, the order of the (key, value) pairs in the array matters, and keys as well as values are compared strictly.
+     * This is essentially an alias for assertSame().
+     *
+     * @param array<mixed> $expected
+     * @param array<mixed> $actual
+     *
+     * @throws ExpectationFailedException
+     *
+     * @no-named-arguments Parameter names are not covered by the backward compatibility promise for PHPUnit
+     *
+     * @see Assert::assertArraysAreIdentical
+     */
+    function assertArraysAreIdentical(array $expected, array $actual, string $message = ''): void
+    {
+        Assert::assertArraysAreIdentical(...func_get_args());
+    }
+}
+
+if (!function_exists('PHPUnit\Framework\assertArraysAreEqual')) {
+    /**
+     * Assert that two arrays are equal.
+     *
+     * The (key, value) relationship matters, the order of the (key, value) pairs in the array matters, and keys as well as values are compared loosely.
+     *
+     * @param array<mixed> $expected
+     * @param array<mixed> $actual
+     *
+     * @throws ExpectationFailedException
+     *
+     * @no-named-arguments Parameter names are not covered by the backward compatibility promise for PHPUnit
+     *
+     * @see Assert::assertArraysAreEqual
+     */
+    function assertArraysAreEqual(array $expected, array $actual, string $message = ''): void
+    {
+        Assert::assertArraysAreEqual(...func_get_args());
+    }
+}
+
+if (!function_exists('PHPUnit\Framework\assertArraysAreIdenticalIgnoringOrder')) {
+    /**
+     * Assert that two arrays are identical while ignoring the order of their values.
+     *
+     * The (key, value) relationship matters, the order of the (key, value) pairs in the array does not matter, and keys as well as values are compared strictly.
+     *
+     * @param array<mixed> $expected
+     * @param array<mixed> $actual
+     *
+     * @throws ExpectationFailedException
+     *
+     * @no-named-arguments Parameter names are not covered by the backward compatibility promise for PHPUnit
+     *
+     * @see Assert::assertArraysAreIdenticalIgnoringOrder
+     */
+    function assertArraysAreIdenticalIgnoringOrder(array $expected, array $actual, string $message = ''): void
+    {
+        Assert::assertArraysAreIdenticalIgnoringOrder(...func_get_args());
+    }
+}
+
+if (!function_exists('PHPUnit\Framework\assertArraysAreEqualIgnoringOrder')) {
+    /**
+     * Assert that two arrays are equal while ignoring the order of their values.
+     *
+     * The (key, value) relationship matters, the order of the (key, value) pairs in the array does not matter, and keys as well as values are compared loosely.
+     * This is essentially an alias for assertEquals().
+     *
+     * @param array<mixed> $expected
+     * @param array<mixed> $actual
+     *
+     * @throws ExpectationFailedException
+     *
+     * @no-named-arguments Parameter names are not covered by the backward compatibility promise for PHPUnit
+     *
+     * @see Assert::assertArraysAreEqualIgnoringOrder
+     */
+    function assertArraysAreEqualIgnoringOrder(array $expected, array $actual, string $message = ''): void
+    {
+        Assert::assertArraysAreEqualIgnoringOrder(...func_get_args());
+    }
+}
+
+if (!function_exists('PHPUnit\Framework\assertArraysHaveIdenticalValues')) {
+    /**
+     * Assert that two arrays have identical values.
+     *
+     * The (key, value) relationship does not matter, the order of the (key, value) pairs in the array matters, and values are compared strictly.
+     *
+     * @param array<mixed> $expected
+     * @param array<mixed> $actual
+     *
+     * @throws ExpectationFailedException
+     *
+     * @no-named-arguments Parameter names are not covered by the backward compatibility promise for PHPUnit
+     *
+     * @see Assert::assertArraysHaveIdenticalValues
+     */
+    function assertArraysHaveIdenticalValues(array $expected, array $actual, string $message = ''): void
+    {
+        Assert::assertArraysHaveIdenticalValues(...func_get_args());
+    }
+}
+
+if (!function_exists('PHPUnit\Framework\assertArraysHaveEqualValues')) {
+    /**
+     * Assert that two arrays have equal values.
+     *
+     * The (key, value) relationship does not matter, the order of the (key, value) pairs in the array matters, and values are compared loosely.
+     *
+     * @param array<mixed> $expected
+     * @param array<mixed> $actual
+     *
+     * @throws ExpectationFailedException
+     *
+     * @no-named-arguments Parameter names are not covered by the backward compatibility promise for PHPUnit
+     *
+     * @see Assert::assertArraysHaveEqualValues
+     */
+    function assertArraysHaveEqualValues(array $expected, array $actual, string $message = ''): void
+    {
+        Assert::assertArraysHaveEqualValues(...func_get_args());
+    }
+}
+
+if (!function_exists('PHPUnit\Framework\assertArraysHaveIdenticalValuesIgnoringOrder')) {
+    /**
+     * Assert that two arrays have identical values while ignoring the order of these values.
+     *
+     * The (key, value) relationship does not matter, the order of the (key, value) pairs in the array does not matter, and values are compared strictly.
+     *
+     * @param array<mixed> $expected
+     * @param array<mixed> $actual
+     *
+     * @throws ExpectationFailedException
+     *
+     * @no-named-arguments Parameter names are not covered by the backward compatibility promise for PHPUnit
+     *
+     * @see Assert::assertArraysHaveIdenticalValuesIgnoringOrder
+     */
+    function assertArraysHaveIdenticalValuesIgnoringOrder(array $expected, array $actual, string $message = ''): void
+    {
+        Assert::assertArraysHaveIdenticalValuesIgnoringOrder(...func_get_args());
+    }
+}
+
+if (!function_exists('PHPUnit\Framework\assertArraysHaveEqualValuesIgnoringOrder')) {
+    /**
+     * Assert that two arrays have equal values while ignoring the order of these values.
+     *
+     * The (key, value) relationship does not matter, the order of the (key, value) pairs in the array does not matter, and values are compared loosely.
+     *
+     * @param array<mixed> $expected
+     * @param array<mixed> $actual
+     *
+     * @throws ExpectationFailedException
+     *
+     * @no-named-arguments Parameter names are not covered by the backward compatibility promise for PHPUnit
+     *
+     * @see Assert::assertArraysHaveEqualValuesIgnoringOrder
+     */
+    function assertArraysHaveEqualValuesIgnoringOrder(array $expected, array $actual, string $message = ''): void
+    {
+        Assert::assertArraysHaveEqualValuesIgnoringOrder(...func_get_args());
+    }
+}
+
 if (!function_exists('PHPUnit\Framework\assertContains')) {
     /**
      * Asserts that a haystack contains a needle.
@@ -268,28 +440,6 @@ if (!function_exists('PHPUnit\Framework\assertNotContainsEquals')) {
     function assertNotContainsEquals(mixed $needle, iterable $haystack, string $message = ''): void
     {
         Assert::assertNotContainsEquals(...func_get_args());
-    }
-}
-
-if (!function_exists('PHPUnit\Framework\assertContainsOnly')) {
-    /**
-     * Asserts that a haystack contains only values of a given type.
-     *
-     * @param 'array'|'bool'|'boolean'|'callable'|'double'|'float'|'int'|'integer'|'iterable'|'null'|'numeric'|'object'|'real'|'resource (closed)'|'resource'|'scalar'|'string' $type
-     * @param iterable<mixed>                                                                                                                                                   $haystack
-     *
-     * @throws Exception
-     * @throws ExpectationFailedException
-     *
-     * @deprecated https://github.com/sebastianbergmann/phpunit/issues/6056
-     *
-     * @no-named-arguments Parameter names are not covered by the backward compatibility promise for PHPUnit
-     *
-     * @see Assert::assertContainsOnly
-     */
-    function assertContainsOnly(string $type, iterable $haystack, ?bool $isNativeType = null, string $message = ''): void
-    {
-        Assert::assertContainsOnly(...func_get_args());
     }
 }
 
@@ -574,28 +724,6 @@ if (!function_exists('PHPUnit\Framework\assertContainsOnlyInstancesOf')) {
     function assertContainsOnlyInstancesOf(string $className, iterable $haystack, string $message = ''): void
     {
         Assert::assertContainsOnlyInstancesOf(...func_get_args());
-    }
-}
-
-if (!function_exists('PHPUnit\Framework\assertNotContainsOnly')) {
-    /**
-     * Asserts that a haystack does not contain only values of a given type.
-     *
-     * @param 'array'|'bool'|'boolean'|'callable'|'double'|'float'|'int'|'integer'|'iterable'|'null'|'numeric'|'object'|'real'|'resource (closed)'|'resource'|'scalar'|'string' $type
-     * @param iterable<mixed>                                                                                                                                                   $haystack
-     *
-     * @throws Exception
-     * @throws ExpectationFailedException
-     *
-     * @deprecated https://github.com/sebastianbergmann/phpunit/issues/6056
-     *
-     * @no-named-arguments Parameter names are not covered by the backward compatibility promise for PHPUnit
-     *
-     * @see Assert::assertNotContainsOnly
-     */
-    function assertNotContainsOnly(string $type, iterable $haystack, ?bool $isNativeType = null, string $message = ''): void
-    {
-        Assert::assertNotContainsOnly(...func_get_args());
     }
 }
 
@@ -897,6 +1025,8 @@ if (!function_exists('PHPUnit\Framework\assertEquals')) {
     /**
      * Asserts that two variables are equal.
      *
+     * Comparison is performed using the == operator (loose comparison) and may be performed by a type-specific comparator which may apply type coercion.
+     *
      * @throws ExpectationFailedException
      *
      * @no-named-arguments Parameter names are not covered by the backward compatibility promise for PHPUnit
@@ -912,6 +1042,8 @@ if (!function_exists('PHPUnit\Framework\assertEquals')) {
 if (!function_exists('PHPUnit\Framework\assertEqualsCanonicalizing')) {
     /**
      * Asserts that two variables are equal (canonicalizing).
+     *
+     * Comparison is performed using the == operator (loose comparison) and may be performed by a type-specific comparator which may apply type coercion.
      *
      * @throws ExpectationFailedException
      *
@@ -929,6 +1061,8 @@ if (!function_exists('PHPUnit\Framework\assertEqualsIgnoringCase')) {
     /**
      * Asserts that two variables are equal (ignoring case).
      *
+     * Comparison is performed using the == operator (loose comparison) and may be performed by a type-specific comparator which may apply type coercion.
+     *
      * @throws ExpectationFailedException
      *
      * @no-named-arguments Parameter names are not covered by the backward compatibility promise for PHPUnit
@@ -944,6 +1078,8 @@ if (!function_exists('PHPUnit\Framework\assertEqualsIgnoringCase')) {
 if (!function_exists('PHPUnit\Framework\assertEqualsWithDelta')) {
     /**
      * Asserts that two variables are equal (with delta).
+     *
+     * Comparison is performed using the == operator (loose comparison) and may be performed by a type-specific comparator which may apply type coercion.
      *
      * @throws ExpectationFailedException
      *
@@ -961,6 +1097,8 @@ if (!function_exists('PHPUnit\Framework\assertNotEquals')) {
     /**
      * Asserts that two variables are not equal.
      *
+     * Comparison is performed using the == operator (loose comparison) and may be performed by a type-specific comparator which may apply type coercion.
+     *
      * @throws ExpectationFailedException
      *
      * @no-named-arguments Parameter names are not covered by the backward compatibility promise for PHPUnit
@@ -976,6 +1114,8 @@ if (!function_exists('PHPUnit\Framework\assertNotEquals')) {
 if (!function_exists('PHPUnit\Framework\assertNotEqualsCanonicalizing')) {
     /**
      * Asserts that two variables are not equal (canonicalizing).
+     *
+     * Comparison is performed using the == operator (loose comparison) and may be performed by a type-specific comparator which may apply type coercion.
      *
      * @throws ExpectationFailedException
      *
@@ -993,6 +1133,8 @@ if (!function_exists('PHPUnit\Framework\assertNotEqualsIgnoringCase')) {
     /**
      * Asserts that two variables are not equal (ignoring case).
      *
+     * Comparison is performed using the == operator (loose comparison) and may be performed by a type-specific comparator which may apply type coercion.
+     *
      * @throws ExpectationFailedException
      *
      * @no-named-arguments Parameter names are not covered by the backward compatibility promise for PHPUnit
@@ -1008,6 +1150,8 @@ if (!function_exists('PHPUnit\Framework\assertNotEqualsIgnoringCase')) {
 if (!function_exists('PHPUnit\Framework\assertNotEqualsWithDelta')) {
     /**
      * Asserts that two variables are not equal (with delta).
+     *
+     * Comparison is performed using the == operator (loose comparison) and may be performed by a type-specific comparator which may apply type coercion.
      *
      * @throws ExpectationFailedException
      *
@@ -1801,6 +1945,8 @@ if (!function_exists('PHPUnit\Framework\assertSame')) {
      * Used on objects, it asserts that two variables reference
      * the same object.
      *
+     * Comparison is performed using the === operator.
+     *
      * @template ExpectedType
      *
      * @param ExpectedType $expected
@@ -1824,6 +1970,8 @@ if (!function_exists('PHPUnit\Framework\assertNotSame')) {
      * Asserts that two variables do not have the same type and value.
      * Used on objects, it asserts that two variables do not reference
      * the same object.
+     *
+     * Comparison is performed using the === operator.
      *
      * @throws ExpectationFailedException
      *
@@ -2971,13 +3119,6 @@ if (!function_exists('PHPUnit\Framework\containsIdentical')) {
     }
 }
 
-if (!function_exists('PHPUnit\Framework\containsOnly')) {
-    function containsOnly(string $type): TraversableContainsOnly
-    {
-        return Assert::containsOnly(...func_get_args());
-    }
-}
-
 if (!function_exists('PHPUnit\Framework\containsOnlyArray')) {
     function containsOnlyArray(): TraversableContainsOnly
     {
@@ -3265,13 +3406,6 @@ if (!function_exists('PHPUnit\Framework\isString')) {
     }
 }
 
-if (!function_exists('PHPUnit\Framework\isType')) {
-    function isType(string $type): IsType
-    {
-        return Assert::isType(...func_get_args());
-    }
-}
-
 if (!function_exists('PHPUnit\Framework\lessThan')) {
     function lessThan(mixed $value): LessThan
     {
@@ -3360,6 +3494,8 @@ if (!function_exists('PHPUnit\Framework\any')) {
     /**
      * Returns a matcher that matches when the method is executed
      * zero or more times.
+     *
+     * @deprecated https://github.com/sebastianbergmann/phpunit/issues/6461
      */
     function any(): AnyInvokedCountMatcher
     {
@@ -3384,6 +3520,14 @@ if (!function_exists('PHPUnit\Framework\atLeast')) {
      */
     function atLeast(int $requiredInvocations): InvokedAtLeastCountMatcher
     {
+        if ($requiredInvocations < 1) {
+            EventFacade::emitter()->testTriggeredPhpunitDeprecation(
+                null,
+                'Calling atLeast() with an argument that is not positive is deprecated.' . PHP_EOL .
+                'This will become an error in PHPUnit 14.',
+            );
+        }
+
         return new InvokedAtLeastCountMatcher(
             $requiredInvocations,
         );

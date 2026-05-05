@@ -12,14 +12,18 @@ namespace SebastianBergmann\CodeCoverage\Report\Html;
 use function count;
 use function sprintf;
 use function str_repeat;
+use function usort;
 use SebastianBergmann\CodeCoverage\FileCouldNotBeWrittenException;
 use SebastianBergmann\CodeCoverage\Node\AbstractNode as Node;
 use SebastianBergmann\CodeCoverage\Node\Directory as DirectoryNode;
+use SebastianBergmann\CodeCoverage\Node\File as FileNode;
 use SebastianBergmann\Template\Exception;
 use SebastianBergmann\Template\Template;
 
 /**
  * @internal This class is not covered by the backward compatibility promise for phpunit/php-code-coverage
+ *
+ * @no-named-arguments Parameter names are not covered by the backward compatibility promise for phpunit/php-code-coverage
  */
 final class Directory extends Renderer
 {
@@ -32,11 +36,25 @@ final class Directory extends Renderer
 
         $items = $this->renderItem($node, true);
 
-        foreach ($node->directories() as $item) {
+        $directories = $node->directories();
+
+        usort(
+            $directories,
+            static fn (DirectoryNode $a, DirectoryNode $b) => $a->name() <=> $b->name(),
+        );
+
+        foreach ($directories as $item) {
             $items .= $this->renderItem($item);
         }
 
-        foreach ($node->files() as $item) {
+        $files = $node->files();
+
+        usort(
+            $files,
+            static fn (FileNode $a, FileNode $b) => $a->name() <=> $b->name(),
+        );
+
+        foreach ($files as $item) {
             $items .= $this->renderItem($item);
         }
 
@@ -61,26 +79,27 @@ final class Directory extends Renderer
     private function renderItem(Node $node, bool $total = false): string
     {
         $data = [
-            'numClasses'                      => $node->numberOfClassesAndTraits(),
-            'numTestedClasses'                => $node->numberOfTestedClassesAndTraits(),
-            'numMethods'                      => $node->numberOfFunctionsAndMethods(),
-            'numTestedMethods'                => $node->numberOfTestedFunctionsAndMethods(),
-            'linesExecutedPercent'            => $node->percentageOfExecutedLines()->asFloat(),
-            'linesExecutedPercentAsString'    => $node->percentageOfExecutedLines()->asString(),
-            'numExecutedLines'                => $node->numberOfExecutedLines(),
-            'numExecutableLines'              => $node->numberOfExecutableLines(),
-            'branchesExecutedPercent'         => $node->percentageOfExecutedBranches()->asFloat(),
-            'branchesExecutedPercentAsString' => $node->percentageOfExecutedBranches()->asString(),
-            'numExecutedBranches'             => $node->numberOfExecutedBranches(),
-            'numExecutableBranches'           => $node->numberOfExecutableBranches(),
-            'pathsExecutedPercent'            => $node->percentageOfExecutedPaths()->asFloat(),
-            'pathsExecutedPercentAsString'    => $node->percentageOfExecutedPaths()->asString(),
-            'numExecutedPaths'                => $node->numberOfExecutedPaths(),
-            'numExecutablePaths'              => $node->numberOfExecutablePaths(),
-            'testedMethodsPercent'            => $node->percentageOfTestedFunctionsAndMethods()->asFloat(),
-            'testedMethodsPercentAsString'    => $node->percentageOfTestedFunctionsAndMethods()->asString(),
-            'testedClassesPercent'            => $node->percentageOfTestedClassesAndTraits()->asFloat(),
-            'testedClassesPercentAsString'    => $node->percentageOfTestedClassesAndTraits()->asString(),
+            'numClasses'                        => $node->numberOfClassesAndTraits(),
+            'numTestedClasses'                  => $node->numberOfTestedClassesAndTraits(),
+            'numMethods'                        => $node->numberOfFunctionsAndMethods(),
+            'numTestedMethods'                  => $node->numberOfTestedFunctionsAndMethods(),
+            'linesExecutedPercent'              => $node->percentageOfExecutedLines()->asFloat(),
+            'linesExecutedPercentAsString'      => $node->percentageOfExecutedLines()->asString(),
+            'numExecutedLines'                  => $node->numberOfExecutedLines(),
+            'numExecutableLines'                => $node->numberOfExecutableLines(),
+            'branchesExecutedPercent'           => $node->percentageOfExecutedBranches()->asFloat(),
+            'branchesExecutedPercentAsString'   => $node->percentageOfExecutedBranches()->asString(),
+            'numExecutedBranches'               => $node->numberOfExecutedBranches(),
+            'numExecutableBranches'             => $node->numberOfExecutableBranches(),
+            'pathsExecutedPercent'              => $node->percentageOfExecutedPaths()->asFloat(),
+            'pathsExecutedPercentAsString'      => $node->percentageOfExecutedPaths()->asString(),
+            'numExecutedPaths'                  => $node->numberOfExecutedPaths(),
+            'numExecutablePaths'                => $node->numberOfExecutablePaths(),
+            'testedMethodsPercent'              => $node->percentageOfTestedFunctionsAndMethods()->asFloat(),
+            'testedMethodsPercentAsString'      => $node->percentageOfTestedFunctionsAndMethods()->asString(),
+            'testedClassesPercent'              => $node->percentageOfTestedClassesAndTraits()->asFloat(),
+            'testedClassesPercentAsString'      => $node->percentageOfTestedClassesAndTraits()->asString(),
+            'numFilesWithoutBranchCoverageData' => $node->numberOfFilesWithoutBranchCoverageData(),
         ];
 
         if ($total) {

@@ -10,6 +10,7 @@
 namespace PHPUnit\Runner;
 
 use const PHP_EOL;
+use function getmypid;
 use function register_shutdown_function;
 use function rtrim;
 
@@ -42,17 +43,20 @@ final class ShutdownHandler
         }
 
         self::$registered = true;
+        $pid              = getmypid();
 
         register_shutdown_function(
-            static function (): void
+            static function () use ($pid): void
             {
                 $message = rtrim(self::$message);
 
-                if ($message === '') {
+                if ($message === '' || $pid !== getmypid()) {
                     return;
                 }
 
                 print $message . PHP_EOL;
+
+                exit(2);
             },
         );
     }

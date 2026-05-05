@@ -1,7 +1,7 @@
 {
     "name": "seba1rx/sessionadmin",
     "description": "php session admin featuring url control and security against hijicking",
-    "type": "library",
+    "type": "composer-plugin",
     "license": "MIT",
     "authors": [
         {
@@ -20,28 +20,25 @@
         ]
     },
     "scripts": {
-        "test": "phpunit --colors=always",
-        "post-install-cmd": [
-            "Seba1rx\\SessionAdmin\\Build\\ComposerScripts::publishAssets",
-            "php -r \"copy(__DIR__.'/assets/seba1rx_sessionadmin.js', getcwd().'/seba1rx_sessionadmin.js');\""
-        ],
-        "post-update-cmd": [
-            "Seba1rx\\SessionAdmin\\Build\\ComposerScripts::publishAssets"
-        ],
+        "test": "XDEBUG_MODE=off phpunit --colors=always",
+        "coverage": "XDEBUG_MODE=coverage phpunit --colors=always --coverage-text --coverage-html=coverage --coverage-clover=coverage/clover.xml",
         "publish-assets": [
-            "Seba1rx\\SessionAdmin\\Build\\ComposerScripts::publishAssets"
+            "Seba1rx\\SessionAdmin\\Build\\SessionAdminPlugin::publishAssets"
         ]
     },
     "extra": {
+        "class": "Seba1rx\\SessionAdmin\\Build\\SessionAdminPlugin",
         "publish": {
             "assets/seba1rx_sessionAdmin.js": "seba1rx_sessionAdmin.js"
         }
     },
     "require": {
-        "php": ">=8.1"
+        "php": ">=8.1",
+        "composer-plugin-api": "^2.0"
     },
     "require-dev": {
-        "phpunit/phpunit": "*"
+        "phpunit/phpunit": "*",
+        "composer/composer": "^2.0"
     },
     "autoload-dev": {
         "psr-4": {

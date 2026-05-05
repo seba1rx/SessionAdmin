@@ -32,6 +32,8 @@ use SebastianBergmann\Complexity\CyclomaticComplexityCalculatingVisitor;
 
 /**
  * @internal This class is not covered by the backward compatibility promise for phpunit/php-code-coverage
+ *
+ * @no-named-arguments Parameter names are not covered by the backward compatibility promise for phpunit/php-code-coverage
  */
 final class CodeUnitFindingVisitor extends NodeVisitorAbstract
 {
@@ -105,7 +107,7 @@ final class CodeUnitFindingVisitor extends NodeVisitorAbstract
             return null;
         }
 
-        if (!$node instanceof Class_ && !$node instanceof Trait_) {
+        if (!$node instanceof Class_ && !$node instanceof Enum_ && !$node instanceof Trait_) {
             return null;
         }
 
@@ -254,7 +256,7 @@ final class CodeUnitFindingVisitor extends NodeVisitorAbstract
             $name,
             $namespacedName,
             $this->namespace($namespacedName, $name),
-            $node->getStartLine(),
+            $this->startLine($node),
             $node->getEndLine(),
             $parentInterfaces,
         );
@@ -282,7 +284,7 @@ final class CodeUnitFindingVisitor extends NodeVisitorAbstract
             $namespacedName,
             $this->namespace($namespacedName, $name),
             $this->file,
-            $node->getStartLine(),
+            $this->startLine($node),
             $node->getEndLine(),
             $parentClass,
             $interfaces,
@@ -301,7 +303,7 @@ final class CodeUnitFindingVisitor extends NodeVisitorAbstract
             $namespacedName,
             $this->namespace($namespacedName, $name),
             $this->file,
-            $node->getStartLine(),
+            $this->startLine($node),
             $node->getEndLine(),
             [],
             $this->processMethods($node->getMethods()),
@@ -320,7 +322,7 @@ final class CodeUnitFindingVisitor extends NodeVisitorAbstract
         foreach ($nodes as $node) {
             $methods[$node->name->toString()] = new Method(
                 $node->name->toString(),
-                $node->getStartLine(),
+                $this->startLine($node),
                 $node->getEndLine(),
                 $this->signature($node),
                 $this->visibility($node),
@@ -344,11 +346,16 @@ final class CodeUnitFindingVisitor extends NodeVisitorAbstract
             $name,
             $namespacedName,
             $this->namespace($namespacedName, $name),
-            $node->getStartLine(),
+            $this->startLine($node),
             $node->getEndLine(),
             $this->signature($node),
             $this->cyclomaticComplexity($node),
         );
+    }
+
+    private function startLine(Class_|ClassMethod|Enum_|Function_|Interface_|Trait_ $node): int
+    {
+        return $node->name->getStartLine();
     }
 
     private function namespace(string $namespacedName, string $name): string
@@ -396,11 +403,11 @@ final class CodeUnitFindingVisitor extends NodeVisitorAbstract
     /**
      * @param list<non-empty-string> $traits
      */
-    private function postProcessClassOrTrait(Class_|Trait_ $node, array $traits): void
+    private function postProcessClassOrTrait(Class_|Enum_|Trait_ $node, array $traits): void
     {
         $name = $node->namespacedName->toString();
 
-        if ($node instanceof Class_) {
+        if ($node instanceof Class_ || $node instanceof Enum_) {
             assert(isset($this->classes[$name]));
 
             $this->classes[$name] = new \SebastianBergmann\CodeCoverage\StaticAnalysis\Class_(

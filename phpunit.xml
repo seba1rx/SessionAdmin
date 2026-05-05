@@ -23,14 +23,8 @@
         <include>
             <directory>src</directory>
         </include>
-
         <exclude>
-            <!-- Exclude entire Exceptions directory -->
             <directory>src/Exceptions</directory>
-
-            <!-- Exclude specific files in src -->
-            <file>src/bootstrap.php</file>
-            <file>src/ComposerScripts.php</file>
         </exclude>
     </source>
 </phpunit>

@@ -2,34 +2,81 @@
 
 namespace Seba1rx\SessionAdmin;
 
+use Seba1rx\SessionAdmin\Contracts\SessionInterface;
+
 /**
- * This class is defined as abstract to force to implement it by extending it.
+ * Abstract public API layer for session management.
  *
- * This class has no abstract methods, so just extend this class by defining a constructor.
+ * Extend this class and define a constructor to configure your session.
+ * There are no abstract methods — the minimum implementation is a constructor
+ * that sets the desired properties (see template below).
  *
- * You will find a template here or you can check the demos
+ * Implements SessionInterface so consumers can type-hint the contract
+ * without depending on the concrete class.
+ *
+ * Template:
+ *
+ *   class MySession extends SessionAdmin
+ *   {
+ *       public function __construct()
+ *       {
+ *           $this->sessionName     = 'my_app';
+ *           $this->sessionLifetime = 3600;
+ *           $this->keys            = ['theme' => 'light'];
+ *       }
+ *   }
  */
-abstract class SessionAdmin extends Session{
+abstract class SessionAdmin extends Session implements SessionInterface
+{
 
     /**
-     * Extend this class and define a constructor, here you have a template for a MPA app:
-     *
-     * $sessionAdmin = new \MyNamespace\MyImplementationOfSessionAdmin(
-     *     [
-     *          "sessionLifetime" => 3600,
-     *          "allowedURLs" => ["index.php", "legal.php", "contact_us.php", "our_history.php", "products_and_plans.php"],
-     *          "keys" => [
-     *              "some_key" => "some_value",
-     *              "foo" => "bar",
-     *          ],
-     *     ]
-     * );
-     * $sessionAdmin->useAuthorization = true; // if you want SessionAdmin to manage authorization
-     * $sessionAdmin->activateSession(); // this is like session_start()
+     * will hold the instance of the TabManager class
+     * @var TabManager
      */
+    public $tabManager;
 
     /**
-     * Starts a new session as guest or renewes user session if $_SESSION['sessionadmin']['uniqueId'] is set
+     * If true will use TabManager class to manage the set and get of session vars by indexing under tab Uuid
+     *
+     * @var boolean
+     */
+    public $useTabIndexation = true;
+
+    /**
+     * Sets the TabManager instance
+     *
+     * @return void
+     */
+    protected function setTabManager(): void
+    {
+        $this->tabManager = new TabManager();
+    }
+
+    /**
+     * Plugs in a custom session storage backend.
+     *
+     * Must be called before activateSession(). Allows swapping PHP's default
+     * file-based storage for any SessionHandlerInterface implementation
+     * (Redis, database, Memcached, encrypted file store, etc.).
+     *
+     * The second argument to session_set_save_handler() is true so PHP
+     * automatically calls session_write_close() on script shutdown, which
+     * prevents data loss when exit() is called without an explicit close.
+     *
+     * @param \SessionHandlerInterface $handler Custom save handler instance.
+     * @return void
+     */
+    public function setSessionHandler(\SessionHandlerInterface $handler): void
+    {
+        session_set_save_handler($handler, true);
+    }
+
+    /**
+     * Starts a new session as guest or renews an existing user session.
+     *
+     * Configures the session cookie, starts the PHP session, enforces lifetime
+     * and hijacking checks, optionally validates URL authorization (MPA), and
+     * initialises the TabManager if tab indexation is enabled.
      *
      * @return void
      */
@@ -40,123 +87,109 @@ abstract class SessionAdmin extends Session{
 
         session_start();
 
-        if(!isset($_SESSION['sessionadmin'])) $_SESSION['sessionadmin'] = [];
+        if (!isset($_SESSION['sessionadmin'])) {
+            $_SESSION['sessionadmin'] = [];
+        }
 
         $this->setSessionTimeStamps();
 
-        $this->uniqueId = bin2hex(random_bytes(6));
-        $_SESSION['sessionadmin']['uniqueId'] = $this->uniqueId;
-
-        if($this->currentStateIsUser()){
-            # user
+        if ($this->currentStateIsUser()) {
             $this->checkTime();
-        }else{
-            # guest
+        } else {
             $this->configureGuestSession();
         }
 
-        // only check url when app is MPA
-        if($this->useAuthorization && !$this->app_isSpa){
+        if (!isset($_SESSION['sessionadmin']['uniqueId'])) {
+            $this->uniqueId = bin2hex(random_bytes(6));
+            $_SESSION['sessionadmin']['uniqueId'] = $this->uniqueId;
+        } else {
+            $this->uniqueId = $_SESSION['sessionadmin']['uniqueId'];
+        }
+
+        if ($this->useAuthorization && !$this->appIsSpa) {
             $this->checkIfUrlIsAllowed();
         }
 
-        // set the session admin tab manager
-        if($this->useTabIndexation){
+        if ($this->useTabIndexation) {
             $this->setTabManager();
-        }else{
+        } else {
             unset($this->tabManager);
         }
 
-        // assign the defined keys to the root of $_SESSION var (if any)
-        foreach($this->keys as $key => $item){
-            if(!isset($_SESSION[$key])){
+        foreach ($this->keys as $key => $item) {
+            if (!isset($_SESSION[$key])) {
                 $_SESSION[$key] = $item;
             }
         }
     }
 
     /**
-     * Adds user data to SESSION and sets time
+     * Marks the current session as authenticated and stores the user identifier.
      *
-     * @param mixed $id_user
+     * Regenerates the session ID to prevent session fixation attacks,
+     * then refreshes cookie lifetime and timestamps.
+     *
+     * @param mixed $id_user Any scalar identifier (int, string, etc.)
      * @return void
      */
     public function createUserSession(mixed $id_user): void
     {
-        // $this->uniqueId = bin2hex(random_bytes(6));
-        // $_SESSION['uniqueId'] = $this->uniqueId;
-
-        $_SESSION['sessionadmin']['isUser'] = TRUE;
+        $_SESSION['sessionadmin']['isUser'] = true;
         $_SESSION['sessionadmin']['msg'] = 'you are a user';
         $_SESSION['sessionadmin']['id_user'] = $id_user;
-        $_SESSION['sessionadmin']['urlIsAllowedToLoad'] = FALSE;
 
+        $this->regenerateSession();
         $this->setSessionTime();
         $this->setSessionTimeStamps();
     }
 
     /**
-     * Terminates the session by wiping out all session data, sends the request to safe pace (if configured)
+     * Terminates the session by wiping out all session data, reinitialises as guest,
+     * and redirects to index (MPA only, when $terminateRedirects is true).
      *
      * @return void
      */
     public function terminate(): void
     {
-        /** destroy session */
         $_SESSION = [];
         $this->destroySession();
 
-        // only for MPA
-        if(!$this->app_isSpa && !$this->isRunningTests){
-            if($this->terminateRedirects){
-                /** go to safe page */
-                $this->redirectToIndex();
-            }
+        if (!$this->appIsSpa && $this->terminateRedirects) {
+            $this->redirectToIndex();
         }
     }
 
     /**
-     * Clears $_SESSION, destroys current session, and calls to start new session as guest
+     * Wipes all session data, destroys the current session, and opens a fresh guest session.
+     *
+     * session_destroy() requires an active session; session_write_close() must NOT be called
+     * before it, as that would leave the session in PHP_SESSION_NONE and trigger a warning.
      *
      * @return void
      */
     protected function destroySession(): void
     {
-        if(isset($_SESSION)){
-            $_SESSION = [];
-            session_write_close();
+        $_SESSION = [];
+        if (session_status() === PHP_SESSION_ACTIVE) {
             session_destroy();
-            $this->activateSession();
         }
+        $this->activateSession();
     }
 
     /**
-     * Calls to destroySession if request is obsolete
-     * * session always exists when this function is called
-     * * if request is still on time, checks if request is hijacking attempt
+     * Calls to destroySession if request is obsolete.
+     * If request is still on time, checks for hijacking attempt and destroys
+     * the session if one is detected, or randomly regenerates the session ID.
      *
      * @return void
      */
     protected function checkTime(): void
     {
-        if($this->requestIsObsolete()){
+        if ($this->requestIsObsolete()) {
             $this->destroySession();
-        }else{
-
+        } else {
             if ($this->requestIsHijackingAttempt()) {
-
-                // Reset session data and regenerate id
-                $_SESSION = [];
-                $_SESSION['sessionadmin'] = [];
-                if($this->proxyAwareIpDetection){
-                    $_SESSION['sessionadmin']['ipAddress'] = $this->getIpAddress_proxyAware();
-                }else{
-                    $_SESSION['sessionadmin']['ipAddress'] = $this->getIpAddress_noProxys();
-                }
-                $_SESSION['sessionadmin']['userAgent'] = $this->getUserAgent();
-                $this->regenerateSession();
-
-                // Give a 3% chance of the session id changing on any request
+                $this->destroySession();
             } elseif ($this->shouldRandomlyRegenerate()) {
                 $this->regenerateSession();
             }
@@ -164,4 +197,3 @@ abstract class SessionAdmin extends Session{
     }
 
 }
-

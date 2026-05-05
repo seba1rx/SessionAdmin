@@ -1,4 +1,17 @@
-.vscode
-.vendor
-.tests/coverage
-.phpunit.cache
+# IDE
+.vscode/
+.idea/
+
+# Composer dependencies
+vendor/
+
+# Generated artifacts — coverage report and the JS file published to project root
+coverage/
+/seba1rx_sessionAdmin.js
+
+# PHPUnit
+.phpunit.cache/
+
+# OS
+.DS_Store
+Thumbs.db

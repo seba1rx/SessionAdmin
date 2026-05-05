@@ -32,6 +32,8 @@ use SebastianBergmann\CodeCoverage\StaticAnalysis\FileAnalyser;
 /**
  * @internal This class is not covered by the backward compatibility promise for phpunit/php-code-coverage
  *
+ * @no-named-arguments Parameter names are not covered by the backward compatibility promise for phpunit/php-code-coverage
+ *
  * @phpstan-import-type XdebugFunctionsCoverageType from XdebugDriver
  * @phpstan-import-type XdebugCodeCoverageWithoutPathCoverageType from XdebugDriver
  * @phpstan-import-type XdebugCodeCoverageWithPathCoverageType from XdebugDriver
@@ -145,6 +147,22 @@ final class RawCodeCoverageData
             $this->lineCoverage[$filename],
             array_flip($lines),
         );
+    }
+
+    /**
+     * @param int[] $lines
+     */
+    public function addMissingExecutableLines(string $filename, array $lines): void
+    {
+        if (!isset($this->lineCoverage[$filename])) {
+            return;
+        }
+
+        foreach ($lines as $line) {
+            if (!isset($this->lineCoverage[$filename][$line])) {
+                $this->lineCoverage[$filename][$line] = Driver::LINE_NOT_EXECUTED;
+            }
+        }
     }
 
     /**

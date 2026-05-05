@@ -1,13 +1,17 @@
 <?php
 /**
- * TabManager bootstrap
+ * SessionAdmin bootstrap
  *
- * Registers internal endpoints:
- *  - POST /sessionadmin/tab-close
- *  - GET  /sessionadmin/debug  (JSON or HTML if SESSIONADMIN_DEBUG_UI)
- *  - POST /sessionadmin/debug/delete-tab
+ * Registers internal endpoints consumed by seba1rx_sessionAdmin.js:
  *
- * if seba1rx_sessionAdmin.js is included these endpoints will be called automatically
+ *   POST /sessionadmin/new-tab            index a new browser tab
+ *   POST /sessionadmin/tab-close          mark a tab as inactive
+ *   GET  /sessionadmin/debug              JSON or HTML debug view (restricted)
+ *   POST /sessionadmin/debug/delete-tab   destroy tab data (restricted)
+ *
+ * Loaded automatically via composer autoload.files — no require needed.
+ * The session must already be active before any of these endpoints run.
+ * Returns immediately (via `return`) when the request URI is not ours.
  */
 
 use Seba1rx\SessionAdmin\TabManager;
@@ -15,181 +19,258 @@ use Seba1rx\SessionAdmin\TabManager;
 if (!defined('__SEBA1RX_SESSIONADMIN_BOOTSTRAPPED__')) {
     define('__SEBA1RX_SESSIONADMIN_BOOTSTRAPPED__', true);
 
-    $uri = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH);
+    $uri    = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?? '';
     $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 
-    // --- NEW TAB ENDPOINT ---------------------------------------------------
+    if (!preg_match('~^/sessionadmin(/|$)~', $uri)) {
+        return; // not our endpoint — let the application handle it
+    }
+
+    // ── Internal helpers (static class to avoid polluting the global namespace) ──
+
+    final class SessionAdminBootstrap
+    {
+        /** Sends a JSON response and terminates the script. */
+        public static function json(mixed $data, int $status = 200): never
+        {
+            http_response_code($status);
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode($data);
+            exit;
+        }
+
+        /** Aborts with 503 when no PHP session is active. */
+        public static function requireSession(): void
+        {
+            if (session_status() !== PHP_SESSION_ACTIVE) {
+                self::json(['error' => 'No active session'], 503);
+            }
+        }
+
+        /**
+         * Aborts with 403 unless debug access is allowed.
+         * Access is granted when:
+         *  - the PHP constant SESSIONADMIN_DEBUG is defined and true, OR
+         *  - the request originates from localhost (127.0.0.1, ::1, or IPv4-mapped ::ffff:127.0.0.1)
+         */
+        public static function requireDebugAccess(): void
+        {
+            $allowed =
+                (defined('SESSIONADMIN_DEBUG') && SESSIONADMIN_DEBUG === true) ||
+                in_array(
+                    $_SERVER['REMOTE_ADDR'] ?? '',
+                    ['127.0.0.1', '::1', '::ffff:127.0.0.1'],
+                    true
+                );
+
+            if (!$allowed) {
+                self::json(['error' => 'Forbidden'], 403);
+            }
+        }
+
+        /**
+         * Reads and validates the tab_id from the JSON request body.
+         * Returns null when the body is malformed or the UUID is invalid.
+         */
+        public static function tabIdFromBody(): ?string
+        {
+            $input = json_decode(file_get_contents('php://input'), true);
+            $tabId = $input['tab_id'] ?? null;
+
+            if (!is_string($tabId) || $tabId === '') {
+                return null;
+            }
+
+            return (new TabManager())->isValidUuid($tabId) ? $tabId : null;
+        }
+    }
+
+    // ── POST /sessionadmin/new-tab ────────────────────────────────────────────
+
     if ($method === 'POST' && preg_match('~^/sessionadmin/new-tab/?$~', $uri)) {
-        $input = json_decode(file_get_contents('php://input'), true);
-        $tabId = $input['tab_id'] ?? null;
-
-        error_log("## new tab: {$tabId}");
+        SessionAdminBootstrap::requireSession();
+        $tabId = SessionAdminBootstrap::tabIdFromBody();
         if ($tabId) {
-            $admin = new TabManager();
-            $admin->indexNewTab($tabId);
+            (new TabManager())->indexNewTab($tabId);
         }
-
-        http_response_code(204);
-        header('Content-Type: application/json');
-        echo json_encode(['status' => 'ok']);
-        exit;
+        SessionAdminBootstrap::json(['status' => 'ok']);
     }
 
-    // --- TAB CLOSE ENDPOINT ---------------------------------------------------
+    // ── POST /sessionadmin/tab-close ──────────────────────────────────────────
+
     if ($method === 'POST' && preg_match('~^/sessionadmin/tab-close/?$~', $uri)) {
-        $input = json_decode(file_get_contents('php://input'), true);
-        $tabId = $input['tab_id'] ?? null;
-
+        SessionAdminBootstrap::requireSession();
+        $tabId = SessionAdminBootstrap::tabIdFromBody();
         if ($tabId) {
-            $admin = new TabManager();
-            $admin->markInactiveTab($tabId);
+            (new TabManager())->markInactiveTab($tabId);
         }
-
-        http_response_code(204);
-        header('Content-Type: application/json');
-        echo json_encode(['status' => 'ok']);
-        exit;
+        SessionAdminBootstrap::json(['status' => 'ok']);
     }
 
-    // --- DELETE TAB ENDPOINT ---------------------------------------------------
+    // ── POST /sessionadmin/debug/delete-tab ───────────────────────────────────
+
     if ($method === 'POST' && preg_match('~^/sessionadmin/debug/delete-tab/?$~', $uri)) {
-        $input = json_decode(file_get_contents('php://input'), true);
-        $tabId = $input['tab_id'] ?? null;
-
-        $allowed =
-            (defined('SESSIONADMIN_DEBUG') && SESSIONADMIN_DEBUG === true) ||
-            in_array($_SERVER['REMOTE_ADDR'] ?? '', ['127.0.0.1', '::1']);
-
-        if (!$allowed) {
-            http_response_code(403);
-            header('Content-Type: application/json');
-            echo json_encode(['error' => 'Forbidden']);
-            exit;
+        SessionAdminBootstrap::requireSession();
+        SessionAdminBootstrap::requireDebugAccess();
+        $tabId = SessionAdminBootstrap::tabIdFromBody();
+        if (!$tabId) {
+            SessionAdminBootstrap::json(['error' => 'Invalid or missing tab_id'], 400);
         }
-
-        if ($tabId) {
-            $tabManager = new TabManager();
-            $tabManager->destroyTabSession($tabId);
-        }
-
-        header('Content-Type: application/json');
-        echo json_encode(['status' => 'deleted', 'tab_id' => $tabId]);
-        exit;
+        (new TabManager())->destroyTabSession($tabId);
+        SessionAdminBootstrap::json(['status' => 'deleted', 'tab_id' => $tabId]);
     }
 
-    // --- DEBUG ENDPOINT -------------------------------------------------------
+    // ── GET /sessionadmin/debug ───────────────────────────────────────────────
+
     if ($method === 'GET' && preg_match('~^/sessionadmin/debug/?$~', $uri)) {
-        $allowed =
-            (defined('SESSIONADMIN_DEBUG') && SESSIONADMIN_DEBUG === true) ||
-            in_array($_SERVER['REMOTE_ADDR'] ?? '', ['127.0.0.1', '::1']);
+        SessionAdminBootstrap::requireSession();
+        SessionAdminBootstrap::requireDebugAccess();
 
-        if (!$allowed) {
-            http_response_code(403);
-            header('Content-Type: application/json');
-            echo json_encode(['error' => 'Forbidden']);
-            exit;
-        }
+        $tabManager   = new TabManager();
+        $tabs         = $tabManager->debug();
+        $currentTabId = $_COOKIE['SESSIONADMIN_TABID'] ?? null;
 
-        $tabManager = new TabManager();
-        $tabs = $tabManager->debug();
-
-        // --- HTML MODE --------------------------------------------------------
         if (defined('SESSIONADMIN_DEBUG_UI') && SESSIONADMIN_DEBUG_UI === true) {
+            // ── HTML mode ────────────────────────────────────────────────────
             header('Content-Type: text/html; charset=utf-8');
             ?>
-            <!DOCTYPE html>
-            <html lang="en">
-            <head>
-                <meta charset="utf-8">
-                <title>Tab Manager Debug</title>
-                <style>
-                    body { font-family: system-ui, sans-serif; background: #f9f9f9; color: #333; padding: 2rem; }
-                    h1 { font-size: 1.6rem; margin-bottom: 1rem; }
-                    table { border-collapse: collapse; width: 100%; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-                    th, td { padding: 0.7rem 1rem; border-bottom: 1px solid #eee; text-align: left; vertical-align: middle; }
-                    th { background: #fafafa; font-weight: 600; }
-                    tr:hover { background: #f5f5f5; }
-                    .active { color: #0a0; font-weight: bold; }
-                    .inactive { color: #a00; font-weight: bold; }
-                    .timestamp { color: #555; font-size: 0.9rem; }
-                    .keys { font-family: monospace; color: #444; font-size: 0.9rem; }
-                    .footer { margin-top: 1rem; font-size: 0.8rem; color: #777; }
-                    button { background: #e33; color: white; border: none; border-radius: 6px; padding: 0.4rem 0.7rem; cursor: pointer; transition: 0.2s; }
-                    button:hover { background: #c00; }
-                </style>
-            </head>
-            <body>
-                <h1>Tab Manager Debug</h1>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Tab UUID</th>
-                            <th>Status</th>
-                            <th>Last Active</th>
-                            <th>Keys</th>
-                            <th>Size (bytes)</th>
-                            <th>Action</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tabs-body">
-                    <?php foreach ($tabs as $tabId => $info): ?>
-                        <tr data-tab="<?= htmlspecialchars($tabId) ?>">
-                            <td><code><?= htmlspecialchars($tabId) ?></code></td>
-                            <td class="<?= $info['is_active'] ? 'active' : 'inactive' ?>">
-                                <?= $info['is_active'] ? 'Active' : 'Inactive' ?>
-                            </td>
-                            <td class="timestamp"><?= htmlspecialchars($info['last_active']) ?></td>
-                            <td class="keys"><?= htmlspecialchars(implode(', ', $info['keys'])) ?: '—' ?></td>
-                            <td><?= (int)$info['size'] ?></td>
-                            <td><button onclick="deleteTab('<?= htmlspecialchars($tabId) ?>', this)">Delete</button></td>
-                        </tr>
-                    <?php endforeach; ?>
-                    </tbody>
-                </table>
-                <div class="footer">
-                    <p><strong>Package:</strong> seba1rx/sessionadmin</p>
-                    <p>Generated at <?= date('Y-m-d H:i:s') ?></p>
-                </div>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SessionAdmin — Tab Debug</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; }
+        body   { font-family: system-ui, sans-serif; background: #f4f4f5; color: #18181b; padding: 2rem; margin: 0; }
+        h1     { font-size: 1.4rem; margin: 0 0 .25rem; }
+        .meta  { color: #71717a; font-size: .85rem; margin-bottom: 1.5rem; }
+        .toolbar { display: flex; gap: .5rem; margin-bottom: 1rem; align-items: center; }
+        .btn   { padding: .35rem .75rem; border: 1px solid #d4d4d8; border-radius: 6px;
+                 background: #fff; cursor: pointer; font-size: .85rem; text-decoration: none; color: inherit; }
+        .btn:hover { background: #f0f0f0; }
+        .btn-danger { border-color: #fca5a5; background: #fff; color: #dc2626; }
+        .btn-danger:hover { background: #fee2e2; }
+        table  { border-collapse: collapse; width: 100%; background: #fff;
+                 border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+        th, td { padding: .65rem 1rem; border-bottom: 1px solid #e4e4e7; text-align: left; vertical-align: middle; }
+        th     { background: #fafafa; font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; color: #52525b; }
+        tr:last-child td { border-bottom: none; }
+        tr:hover td { background: #fafafa; }
+        code   { font-size: .8rem; background: #f4f4f5; padding: .1rem .3rem; border-radius: 3px; }
+        .badge { display: inline-block; padding: .15rem .45rem; border-radius: 999px;
+                 font-size: .72rem; font-weight: 600; line-height: 1.4; }
+        .badge-green  { background: #dcfce7; color: #15803d; }
+        .badge-red    { background: #fee2e2; color: #b91c1c; }
+        .badge-blue   { background: #dbeafe; color: #1d4ed8; }
+        .empty { text-align: center; padding: 2rem; color: #a1a1aa; font-size: .9rem; }
+        .footer { margin-top: 1rem; font-size: .78rem; color: #a1a1aa; }
+    </style>
+</head>
+<body>
+<h1>Tab Manager Debug</h1>
+<p class="meta">
+    Package: <strong>seba1rx/sessionadmin</strong> &nbsp;·&nbsp;
+    Session key: <code><?= htmlspecialchars($tabManager->getSessionKey()) ?></code>
+    <?php if ($currentTabId): ?>
+        &nbsp;·&nbsp; Your tab: <code><?= htmlspecialchars($currentTabId) ?></code>
+    <?php endif; ?>
+</p>
 
-                <script>
-                    async function deleteTab(tabId, btn) {
-                        if (!confirm('Delete session data for this tab?')) return;
+<div class="toolbar">
+    <a href="/sessionadmin/debug" class="btn">&#8635; Refresh</a>
+    <span style="color:#a1a1aa;font-size:.85rem"><?= count($tabs) ?> tab(s) tracked</span>
+</div>
 
-                        btn.disabled = true;
-                        btn.textContent = 'Deleting...';
+<?php if (empty($tabs)): ?>
+    <div class="empty">No tabs are currently tracked in this session.</div>
+<?php else: ?>
+<table>
+    <thead>
+        <tr>
+            <th>Tab UUID</th>
+            <th>Status</th>
+            <th>Last active</th>
+            <th>Keys</th>
+            <th>Size (bytes)</th>
+            <th>Action</th>
+        </tr>
+    </thead>
+    <tbody id="tabs-body">
+    <?php foreach ($tabs as $tabId => $info): ?>
+        <tr id="row-<?= htmlspecialchars($tabId) ?>">
+            <td>
+                <code><?= htmlspecialchars($tabId) ?></code>
+                <?php if ($tabId === $currentTabId): ?>
+                    <span class="badge badge-blue" title="This is the tab making this request">you</span>
+                <?php endif; ?>
+            </td>
+            <td>
+                <?php if ($info['is_active']): ?>
+                    <span class="badge badge-green">Active</span>
+                <?php else: ?>
+                    <span class="badge badge-red">Inactive</span>
+                <?php endif; ?>
+            </td>
+            <td style="font-size:.85rem;color:#52525b"><?= htmlspecialchars($info['last_active']) ?></td>
+            <td style="font-family:monospace;font-size:.82rem">
+                <?= $info['keys'] ? htmlspecialchars(implode(', ', $info['keys'])) : '<span style="color:#a1a1aa">—</span>' ?>
+            </td>
+            <td><?= (int) $info['size'] ?></td>
+            <td>
+                <button class="btn btn-danger"
+                        onclick="deleteTab('<?= htmlspecialchars($tabId) ?>', this)">Delete</button>
+            </td>
+        </tr>
+    <?php endforeach; ?>
+    </tbody>
+</table>
+<?php endif; ?>
 
-                        const response = await fetch('/sessionadmin/debug/delete-tab', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ tab_id: tabId })
-                        });
+<div class="footer">Generated at <?= date('Y-m-d H:i:s') ?> &nbsp;·&nbsp; Session ID: <code><?= session_id() ?></code></div>
 
-                        if (response.ok) {
-                            const row = btn.closest('tr');
-                            row.style.background = '#fee';
-                            setTimeout(() => row.remove(), 300);
-                        } else {
-                            alert('Failed to delete tab.');
-                            btn.disabled = false;
-                            btn.textContent = 'Delete';
-                        }
-                    }
-                </script>
-            </body>
-            </html>
+<script>
+    async function deleteTab(tabId, btn) {
+        if (!confirm('Delete session data for tab ' + tabId + '?')) return;
+        btn.disabled    = true;
+        btn.textContent = 'Deleting…';
+
+        try {
+            const res = await fetch('/sessionadmin/debug/delete-tab', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({ tab_id: tabId }),
+            });
+
+            if (res.ok) {
+                const row = document.getElementById('row-' + tabId);
+                if (row) row.style.opacity = '0.3';
+                setTimeout(() => location.reload(), 350);
+            } else {
+                const err = await res.json().catch(() => ({ error: 'Unknown error' }));
+                alert('Delete failed: ' + (err.error ?? res.status));
+                btn.disabled    = false;
+                btn.textContent = 'Delete';
+            }
+        } catch (e) {
+            alert('Request error: ' + e.message);
+            btn.disabled    = false;
+            btn.textContent = 'Delete';
+        }
+    }
+</script>
+</body>
+</html>
             <?php
             exit;
         }
 
-        // --- JSON MODE --------------------------------------------------------
-        header('Content-Type: application/json; charset=utf-8');
-        echo json_encode([
-            'package' => 'seba1rx/sessionadmin',
-            'version' => '1.0.0',
+        // ── JSON mode ─────────────────────────────────────────────────────────
+        SessionAdminBootstrap::json([
+            'package'     => 'seba1rx/sessionadmin',
             'session_key' => $tabManager->getSessionKey(),
-            'tabs' => $tabs,
-            'session' => $_SESSION,
-        ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-        exit;
+            'current_tab' => $currentTabId,
+            'tabs'        => $tabs,
+        ]);
     }
 }

@@ -21,6 +21,8 @@ use function ini_set;
 use function is_array;
 use function is_bool;
 use function is_float;
+use function is_infinite;
+use function is_nan;
 use function is_object;
 use function is_resource;
 use function is_string;
@@ -31,6 +33,7 @@ use function spl_object_id;
 use function sprintf;
 use function str_repeat;
 use function str_replace;
+use function strpbrk;
 use function strtr;
 use function var_export;
 use BackedEnum;
@@ -236,10 +239,10 @@ final readonly class Exporter
 
         if (!$value instanceof stdClass) {
             // using ReflectionClass prevents initialization of potential lazy objects
-            return count((new ReflectionClass($value))->getProperties());
+            return count(new ReflectionClass($value)->getProperties());
         }
 
-        return count((new ReflectionObject($value))->getProperties());
+        return count(new ReflectionObject($value)->getProperties());
     }
 
     /**
@@ -348,15 +351,24 @@ final readonly class Exporter
 
     private function exportFloat(float $value): string
     {
+        if (is_nan($value)) {
+            return 'NAN';
+        }
+
+        if (is_infinite($value)) {
+            return $value > 0 ? 'INF' : '-INF';
+        }
+
         $precisionBackup = ini_get('precision');
 
         ini_set('precision', '-1');
 
-        $valueAsString = @(string) $value;
+        $valueAsString = (string) $value;
 
         ini_set('precision', $precisionBackup);
 
-        if ((string) @(int) $value === $valueAsString) {
+        // Add '.0' only if decimals and scientific notation are absent.
+        if (strpbrk($valueAsString, '.E') === false) {
             return $valueAsString . '.0';
         }
 

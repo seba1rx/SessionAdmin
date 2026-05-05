@@ -27,6 +27,8 @@ use PhpParser\NodeVisitorAbstract;
 /**
  * @internal This class is not covered by the backward compatibility promise for phpunit/php-code-coverage
  *
+ * @no-named-arguments Parameter names are not covered by the backward compatibility promise for phpunit/php-code-coverage
+ *
  * @phpstan-import-type LinesType from AnalysisResult
  */
 final class ExecutableLinesFindingVisitor extends NodeVisitorAbstract
@@ -83,7 +85,9 @@ final class ExecutableLinesFindingVisitor extends NodeVisitorAbstract
             return null;
         }
 
-        if ($node instanceof Node\Stmt\Interface_) {
+        if ($node instanceof Node\Stmt\Interface_ ||
+            $node instanceof Node\Attribute
+        ) {
             foreach (range($node->getStartLine(), $node->getEndLine()) as $line) {
                 $this->unsets[$line] = true;
             }
@@ -140,6 +144,10 @@ final class ExecutableLinesFindingVisitor extends NodeVisitorAbstract
             $node instanceof Node\Stmt\ClassMethod ||
             $node instanceof Node\Expr\Closure ||
             $node instanceof Node\Stmt\Trait_) {
+            if ($node instanceof Node\Stmt\ClassMethod && $node->isAbstract()) {
+                return null;
+            }
+
             if ($node instanceof Node\Stmt\Function_ || $node instanceof Node\Stmt\ClassMethod) {
                 $unsets = [];
 

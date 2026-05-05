@@ -1,11 +1,7 @@
 <?php
 
-/** destroy session */
-$sessionName = 'MyCustomMPASessionName';
-session_name($sessionName);
-session_start();
-$_SESSION = [];
-session_destroy();
+require 'AppFiles/required.php';
 
-/** go to main page */
-header('Location: index.php');
+// terminate() destroys the session, opens a fresh guest session,
+// and redirects to index.php (because appIsSpa = false in required.php).
+$sessionAdmin->terminate();

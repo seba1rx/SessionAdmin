@@ -20,19 +20,27 @@ use function str_replace;
 use function time;
 use DOMDocument;
 use DOMElement;
-use SebastianBergmann\CodeCoverage\CodeCoverage;
+use SebastianBergmann\CodeCoverage\Node\Directory;
 use SebastianBergmann\CodeCoverage\Node\File;
+use SebastianBergmann\CodeCoverage\Util\EnsuresUtf8;
 use SebastianBergmann\CodeCoverage\Util\Filesystem;
 use SebastianBergmann\CodeCoverage\Util\Xml;
 use SebastianBergmann\CodeCoverage\Version;
 use SebastianBergmann\CodeCoverage\WriteOperationFailedException;
 
+/**
+ * @internal This class is not covered by the backward compatibility promise for phpunit/php-code-coverage
+ *
+ * @no-named-arguments Parameter names are not covered by the backward compatibility promise for phpunit/php-code-coverage
+ */
 final class OpenClover
 {
+    use EnsuresUtf8;
+
     /**
      * @throws WriteOperationFailedException
      */
-    public function process(CodeCoverage $coverage, ?string $target = null, ?string $name = null): string
+    public function process(Directory $report, ?string $target = null, ?string $name = null): string
     {
         $time = (string) time();
 
@@ -48,14 +56,13 @@ final class OpenClover
         $xmlProject->setAttribute('timestamp', $time);
 
         if (is_string($name)) {
-            $xmlProject->setAttribute('name', $name);
+            $xmlProject->setAttribute('name', $this->ensureUtf8($name));
         }
 
         $xmlCoverage->appendChild($xmlProject);
 
         /** @var array<non-empty-string, DOMElement> $packages */
         $packages = [];
-        $report   = $coverage->getReport();
 
         foreach ($report as $item) {
             if (!$item instanceof File) {
@@ -63,8 +70,8 @@ final class OpenClover
             }
 
             $xmlFile = $xmlDocument->createElement('file');
-            $xmlFile->setAttribute('name', basename($item->pathAsString()));
-            $xmlFile->setAttribute('path', $item->pathAsString());
+            $xmlFile->setAttribute('name', $this->ensureUtf8(basename($item->pathAsString())));
+            $xmlFile->setAttribute('path', $this->ensureUtf8($item->pathAsString()));
 
             $classes      = $item->classesAndTraits();
             $coverageData = $item->lineCoverageData();
@@ -78,53 +85,53 @@ final class OpenClover
                 $classMethods           = 0;
 
                 // Assumption: one namespace per file
-                if ($class['namespace'] !== '') {
-                    $namespace = $class['namespace'];
+                if ($class->namespace !== '') {
+                    $namespace = $class->namespace;
                 }
 
-                foreach ($class['methods'] as $methodName => $method) {
+                foreach ($class->methods as $methodName => $method) {
                     /** @phpstan-ignore equal.notAllowed */
-                    if ($method['executableLines'] == 0) {
+                    if ($method->executableLines == 0) {
                         continue;
                     }
 
                     $classMethods++;
-                    $classStatements        += $method['executableLines'];
-                    $coveredClassStatements += $method['executedLines'];
+                    $classStatements        += $method->executableLines;
+                    $coveredClassStatements += $method->executedLines;
 
                     /** @phpstan-ignore equal.notAllowed */
-                    if ($method['coverage'] == 100) {
+                    if ($method->coverage == 100) {
                         $coveredMethods++;
                     }
 
                     $methodCount = 0;
 
-                    foreach (range($method['startLine'], $method['endLine']) as $line) {
+                    foreach (range($method->startLine, $method->endLine) as $line) {
                         if (isset($coverageData[$line])) {
                             $methodCount = max($methodCount, count($coverageData[$line]));
                         }
                     }
 
-                    $lines[$method['startLine']] = [
-                        'ccn'        => $method['ccn'],
+                    $lines[$method->startLine] = [
+                        'ccn'        => $method->ccn,
                         'count'      => $methodCount,
                         'type'       => 'method',
-                        'signature'  => $method['signature'],
-                        'visibility' => $method['visibility'],
+                        'signature'  => $method->signature,
+                        'visibility' => $method->visibility,
                     ];
                 }
 
                 $xmlClass = $xmlDocument->createElement('class');
-                $xmlClass->setAttribute('name', str_replace($class['namespace'] . '\\', '', $className));
+                $xmlClass->setAttribute('name', $this->ensureUtf8(str_replace($class->namespace . '\\', '', $className)));
 
                 $xmlFile->appendChild($xmlClass);
 
                 $xmlMetrics = $xmlDocument->createElement('metrics');
-                $xmlMetrics->setAttribute('complexity', (string) $class['ccn']);
-                $xmlMetrics->setAttribute('elements', (string) ($classMethods + $classStatements + $class['executableBranches']));
-                $xmlMetrics->setAttribute('coveredelements', (string) ($coveredMethods + $coveredClassStatements + $class['executedBranches']));
-                $xmlMetrics->setAttribute('conditionals', (string) $class['executableBranches']);
-                $xmlMetrics->setAttribute('coveredconditionals', (string) $class['executedBranches']);
+                $xmlMetrics->setAttribute('complexity', (string) $class->ccn);
+                $xmlMetrics->setAttribute('elements', (string) ($classMethods + $classStatements + $class->executableBranches));
+                $xmlMetrics->setAttribute('coveredelements', (string) ($coveredMethods + $coveredClassStatements + $class->executedBranches));
+                $xmlMetrics->setAttribute('conditionals', (string) $class->executableBranches);
+                $xmlMetrics->setAttribute('coveredconditionals', (string) $class->executedBranches);
                 $xmlMetrics->setAttribute('statements', (string) $classStatements);
                 $xmlMetrics->setAttribute('coveredstatements', (string) $coveredClassStatements);
                 $xmlMetrics->setAttribute('methods', (string) $classMethods);
@@ -157,7 +164,7 @@ final class OpenClover
                 $xmlLine->setAttribute('count', (string) $data['count']);
 
                 if (isset($data['signature'])) {
-                    $xmlLine->setAttribute('signature', $data['signature']);
+                    $xmlLine->setAttribute('signature', $this->ensureUtf8($data['signature']));
                 }
 
                 if (isset($data['visibility'])) {
@@ -186,7 +193,7 @@ final class OpenClover
 
             if (!isset($packages[$namespace])) {
                 $packages[$namespace] = $xmlDocument->createElement('package');
-                $packages[$namespace]->setAttribute('name', $namespace);
+                $packages[$namespace]->setAttribute('name', $this->ensureUtf8($namespace));
 
                 $xmlPackageMetrics = $xmlDocument->createElement('metrics');
                 $xmlPackageMetrics->setAttribute('complexity', '0');

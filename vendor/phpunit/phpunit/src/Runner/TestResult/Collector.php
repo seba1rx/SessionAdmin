@@ -250,6 +250,8 @@ final class Collector
         }
 
         $this->testSuiteSkippedEvents[] = $event;
+
+        $this->numberOfTestsRun += $event->testSuite()->count();
     }
 
     public function testSuiteStarted(TestSuiteStarted $event): void
@@ -278,6 +280,10 @@ final class Collector
             assert($test instanceof TestMethod);
 
             foreach ($this->testFailedEvents as $testFailedEvent) {
+                if ($testFailedEvent instanceof AfterLastTestMethodFailed || $testFailedEvent instanceof BeforeFirstTestMethodFailed) {
+                    continue;
+                }
+
                 if ($testFailedEvent->test()->isTestMethod() && $testFailedEvent->test()->methodName() === $test->methodName()) {
                     return;
                 }

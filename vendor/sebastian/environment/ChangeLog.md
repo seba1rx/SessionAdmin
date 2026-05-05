@@ -2,6 +2,48 @@
 
 All notable changes in `sebastianbergmann/environment` are documented in this file using the [Keep a CHANGELOG](http://keepachangelog.com/) principles.
 
+## [9.3.0] - 2026-04-15
+
+### Added
+
+* `Runtime::getSettingsNotChangeableAtRuntime()`
+
+## [9.2.0] - 2026-04-05
+
+### Added
+
+* [`#80`](https://github.com/sebastianbergmann/environment/issues/80): Support for `FORCE_COLOR` environment variable
+
+## [9.1.0] - 2026-03-22
+
+### Added
+
+* `Host` class
+
+## [9.0.1] - 2026-03-15
+
+### Fixed
+
+* [#79](https://github.com/sebastianbergmann/environment/issues/79): Warnings in non-TTY environments
+
+## [9.0.0] - 2026-02-06
+
+### Removed
+
+* This component is no longer supported on PHP 8.3
+
+## [8.1.0] - 2026-MM-DD
+
+### Added
+
+* `Runtime::getSettingsNotChangeableAtRuntime()`
+
+## [8.0.4] - 2026-03-15
+
+### Fixed
+
+* [#79](https://github.com/sebastianbergmann/environment/issues/79): Warnings in non-TTY environments
+
 ## [8.0.3] - 2025-08-12
 
 ### Changed
@@ -239,6 +281,14 @@ All notable changes in `sebastianbergmann/environment` are documented in this fi
 
 * This component is no longer supported on PHP 5.6
 
+[9.3.0]: https://github.com/sebastianbergmann/environment/compare/9.2.0...9.3.0
+[9.2.0]: https://github.com/sebastianbergmann/environment/compare/9.1.0...9.2.0
+[9.1.0]: https://github.com/sebastianbergmann/environment/compare/9.0.1...9.1.0
+[9.0.1]: https://github.com/sebastianbergmann/environment/compare/9.0.0...9.0.1
+[9.0.0]: https://github.com/sebastianbergmann/environment/compare/8.0...9.0.0
+[8.1.0]: https://github.com/sebastianbergmann/environment/compare/8.0.4...8.0
+[8.0.4]: https://github.com/sebastianbergmann/environment/compare/8.0.3...8.0.4
+[8.0.4]: https://github.com/sebastianbergmann/environment/compare/8.0.3...8.0
 [8.0.3]: https://github.com/sebastianbergmann/environment/compare/8.0.2...8.0.3
 [8.0.2]: https://github.com/sebastianbergmann/environment/compare/8.0.1...8.0.2
 [8.0.1]: https://github.com/sebastianbergmann/environment/compare/8.0.0...8.0.1

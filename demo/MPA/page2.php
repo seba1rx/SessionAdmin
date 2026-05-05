@@ -1,94 +1,82 @@
-<?php require('AppFiles/required.php'); ?>
+<?php require 'AppFiles/required.php'; ?>
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
-    <!-- SessionAdminClient -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SessionAdmin — MPA Demo</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
     <script src="assets/seba1rx_sessionAdmin.js"></script>
-    <script>
-        // Optional: enable automatic tab cleanup
-        window.SESSIONADMIN_AUTO_DESTROY = true;
-        window.SESSIONADMIN_DEBUG = true;
-        window.SESSIONADMIN_DEBUG_UI = true;
-    </script>
 </head>
-<body>
-    <div class="wrapper p-5">
-        <div class="row mt-5 justify-content-center">
-            <div class="col-lg-8 col-sm-10 <?php echo ($_SESSION['sessionadmin']['urlIsAllowedToLoad'] ?? true ? 'bg-info' : 'bg-danger'); ?> text-center text-white">
-                <h3>Public content, you are in page2.php</h3>
-                <p>Anyone can see this content, you are in page2.php</p>
+<body class="bg-light">
+<div class="container py-5">
 
-                <?php if($_SESSION['sessionadmin']['isUser']){ ?>
-                <img src="<?php echo $_SESSION['data']['avatar']; ?>" alt="avatar" style="max-width: 100px;" class="img-thumbnail mb-1 bg-info">
-                <?php } ?>
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
 
+            <div class="p-4 mb-4 rounded text-white <?= $_SESSION['sessionadmin']['urlIsAllowedToLoad'] ? 'bg-success' : 'bg-secondary' ?>">
+                <h4 class="mb-1">page2.php — Public page</h4>
+                <p class="mb-0 small">Everyone can access this page.</p>
             </div>
-        </div>
-        <div class="row justify-content-center no-gutters">
-            <div class="col-lg-8 col-sm-10">
-                <?php if(!$_SESSION['sessionadmin']['isUser']){ ?>
-                <div class="col-12">
-                    <form id="loginForm" name="loginForm" onsubmit="return tryToAuthenticate(event)" class="form-inline mt-2">
-                        <input type="email" title="Enter email" class="form-control mr-1" name="useremail" placeholder="email@example.com" value="demo@mail.com">
-                        <input type="password" title="Enter password" class="form-control mr-1" name="userpassword" value="your_password_here">
-                        <button type="submit" class="btn btn-info">Authenticate</button>
+
+            <?php if (!$_SESSION['sessionadmin']['isUser']): ?>
+            <div class="card mb-4" style="max-width: 420px;">
+                <div class="card-body">
+                    <h5 class="card-title">Log in</h5>
+                    <p class="text-muted small">Any email and password will work in this demo.</p>
+                    <form id="loginForm">
+                        <div class="mb-3">
+                            <label class="form-label">Email</label>
+                            <input type="email" class="form-control" name="useremail" value="demo@mail.com" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Password</label>
+                            <input type="password" class="form-control" name="userpassword" value="your_password_here">
+                        </div>
+                        <button type="button" class="btn btn-primary w-100" onclick="tryToAuthenticate()">Authenticate</button>
                     </form>
                 </div>
-                <?php } ?>
-                <div class="row mt-3">
-                    <div class="col-6">
-                        <p>Contents of this demo are:</p>
-                        <dd>
-                            <li><a href="index.php">index.php</a> -> public</li>
-                            <li><a href="page2.php">page2.php</a> -> public</li>
-                            <li><a href="private.php">private.php</a> -> private</li>
-                        </dd>
+            </div>
+            <?php endif; ?>
 
-                        <span>
-                            if you are a guest and click on private.php in the menu, you won't be able to load it and will be sent to index
-                        </span>
-
-                        <br>
-
-                        <?php if($_SESSION['sessionadmin']['isUser']){ ?>
-                        <a href="exit.php" class="btn btn-success mt-2">Log out</a>
-                        <?php } ?>
-
-                    </div>
-                    <div class="col-6">
-                        <h5>your session data:</h5>
-                        <pre><?php echo json_encode($_SESSION ?? [], JSON_PRETTY_PRINT) ?></pre>
-                    </div>
+            <div class="row g-4">
+                <div class="col-md-6">
+                    <h6>Navigation</h6>
+                    <ul class="list-unstyled">
+                        <li><a href="index.php">index.php</a> — public</li>
+                        <li><a href="page2.php">page2.php</a> — public (login here)</li>
+                        <li><a href="private.php">private.php</a> — private (requires login)</li>
+                    </ul>
+                    <?php if ($_SESSION['sessionadmin']['isUser']): ?>
+                        <a href="exit.php" class="btn btn-outline-danger btn-sm mt-2">Log out</a>
+                    <?php endif; ?>
+                </div>
+                <div class="col-md-6">
+                    <h6>Session data</h6>
+                    <pre class="bg-white border rounded p-2 small"><?= json_encode($_SESSION, JSON_PRETTY_PRINT) ?></pre>
                 </div>
             </div>
+
         </div>
     </div>
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
-    <script>
-        function tryToAuthenticate(event){
-            event.preventDefault();
-            $.ajax({
-                type: "POST",
-                url: "AppFiles/authentication.php",
-                data: $('#loginForm').serializeArray(),
-                dataType: "json",
-                success: function(response) {
-                    if(response.ok){
-                        alert(response.msg);
-                        location.reload();
-                    }else if(response.redirect){
-                        window.location.href = response.redirect;
-                    }else{
-                        alert(response.msg);
-                    }
-                },
-                error: function(jqXHR, textStatus, errorThrown) {
-                    console.error("Error:", textStatus, errorThrown);
-                    alert("sorry, something went wrong.");
-                }
-            });
-        };
-    </script>
+</div>
+<script>
+    async function tryToAuthenticate() {
+        const form   = document.getElementById('loginForm');
+        const params = new URLSearchParams(new FormData(form));
+        const res    = await fetch('AppFiles/authentication.php', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body:    params,
+        });
+        const data = await res.json();
+        if (data.ok) {
+            alert(data.msg);
+            location.reload();
+        } else {
+            alert(data.msg);
+        }
+    }
+</script>
 </body>
 </html>

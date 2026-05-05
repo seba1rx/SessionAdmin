@@ -1,28 +1,49 @@
 <?php
+declare(strict_types=1);
 
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\UsesClass;
 use PHPUnit\Framework\TestCase;
+use Seba1rx\SessionAdmin\Session;
 use Seba1rx\SessionAdmin\SessionAdmin;
-
+use Seba1rx\SessionAdmin\TabManager;
+use Seba1rx\SessionAdmin\Contracts\SessionInterface;
+use Seba1rx\SessionAdmin\Exceptions\SessionAdminException;
 
 #[CoversClass(SessionAdmin::class)]
+#[CoversClass(Session::class)]
+#[UsesClass(TabManager::class)]
 class SessionAdminTest extends TestCase
 {
+    // ── Fixture factory ──────────────────────────────────────────────────────
 
+    /**
+     * Returns a concrete anonymous subclass of SessionAdmin ready for testing.
+     *
+     * The subclass:
+     *  - accepts a $config array (sessionLifetime, allowedURLs, keys)
+     *  - overrides setCookie / getCookie so no real HTTP headers are sent
+     *  - overrides redirectToIndex() so tests are not killed by exit()
+     *
+     * @param array $config
+     * @return SessionAdmin
+     */
     protected function getSessionAdminConcrete(array $config = []): SessionAdmin
     {
-        // Since SessionAdmin requires an implementation to define a constructor, lets define one here
-        return new class('SessionAdminConcrete', $config) extends SessionAdmin {
+        return new class($config) extends SessionAdmin {
 
+            /** Stores cookies intercepted by the setCookie override. */
             public array $cookies = [];
 
-            public function __construct(string $name, array $config = [])
+            /** Set to true whenever redirectToIndex() is called. */
+            public bool $redirectCalled = false;
+
+            public function __construct(array $config = [])
             {
                 if (isset($config['sessionLifetime'])) {
                     $this->sessionLifetime = $config['sessionLifetime'];
                 }
                 if (isset($config['allowedURLs'])) {
-                    // echo "## assigning allowedURLs: " . json_encode($config['allowedURLs']);
                     $this->allowedUrls = $config['allowedURLs'];
                 }
                 if (isset($config['keys'])) {
@@ -30,392 +51,733 @@ class SessionAdminTest extends TestCase
                 }
             }
 
-            // in order to test the setCookie and getCookie methods,
-            // lets define mock methods not to set headers
-            protected function mockSetCookie(
+            /** Intercepts setcookie() so tests don't emit headers. */
+            protected function setCookie(
                 string $name,
-                string $value,
-                int|string|array $expiresOrOptions,
+                string $value = "",
+                int|string|array $expiresOrOptions = 0,
                 string $path = "",
                 string $domain = "",
                 bool $secure = false,
                 bool $httponly = false
             ): bool {
                 $this->cookies[$name] = compact(
-                    'name',
-                    'value',
-                    'expiresOrOptions',
-                    'path',
-                    'domain',
-                    'secure',
-                    'httponly'
+                    'name', 'value', 'expiresOrOptions', 'path', 'domain', 'secure', 'httponly'
                 );
                 return true;
             }
 
-            protected function mockGetCookie(string $name, mixed $default = null): mixed
+            /** Reads from the in-memory cookie store instead of $_COOKIE. */
+            protected function getCookie(string $name, mixed $default = null): mixed
             {
                 return $this->cookies[$name]['value'] ?? $default;
+            }
+
+            /** Prevents exit() from killing the test process on redirects. */
+            protected function redirectToIndex(): void
+            {
+                $this->redirectCalled = true;
             }
         };
     }
 
+    // ── setUp ────────────────────────────────────────────────────────────────
+
     protected function setUp(): void
     {
         parent::setUp();
+
         if (session_status() === PHP_SESSION_ACTIVE) {
             session_write_close();
         }
+        // Prevent the next session_start() from reopening the same session file.
+        // session_write_close() retains the session ID in PHP memory; setting a new
+        // random ID here forces a fresh session on the next session_start() call.
+        session_id(bin2hex(random_bytes(16)));
+
         $_SESSION = [];
-        $_COOKIE = [];
-        $_SERVER = [
-            'REMOTE_ADDR' => '192.168.1.100',
-            'HTTP_USER_AGENT' => 'PHPUnit',
-            'SERVER_NAME' => 'localhost',
+        $_COOKIE  = [];
+        $_SERVER  = [
+            'REMOTE_ADDR'      => '192.168.1.100',
+            'HTTP_USER_AGENT'  => 'PHPUnit',
+            'SERVER_NAME'      => 'localhost',
         ];
     }
 
-    /* ───────────────────────────────
-    SESSION LIFECYCLE TESTS
-    ─────────────────────────────── */
+    // ── Helper ───────────────────────────────────────────────────────────────
 
-    /**
-     * @covers \Seba1rx\SessionAdmin\SessionAdmin::activateSession
-     * @return void
-     */
+    /** Expose any protected/private method via Reflection. */
+    private function method(object $object, string $name): \ReflectionMethod
+    {
+        return new \ReflectionMethod($object::class, $name);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // SESSION LIFECYCLE
+    // ═══════════════════════════════════════════════════════════════════════
+
     public function testActivateSessionCreatesGuestSession(): void
     {
         $admin = $this->getSessionAdminConcrete();
-
-        // $setIsRunningTests = $this->getPrivateMethod($admin, 'setIsRunningTests');
-        // $setIsRunningTests->invoke($admin, true);
-
         $admin->activateSession();
 
-        // echo json_encode($_SESSION);
-
-        $this->assertArrayHasKey('isUser', $_SESSION);
-        $this->assertFalse($_SESSION['isUser']);
-        $this->assertSame('you are a guest', $_SESSION['msg']);
-        $this->assertArrayHasKey('allowedUrl', $_SESSION);
+        $sa = $_SESSION['sessionadmin'];
+        $this->assertFalse($sa['isUser']);
+        $this->assertSame('you are a guest', $sa['msg']);
+        $this->assertArrayHasKey('allowedUrl', $sa);
+        $this->assertFalse($sa['urlIsAllowedToLoad']);
     }
 
-    /**
-     * @covers \Seba1rx\SessionAdmin\SessionAdmin::activateSession
-     * @covers \Seba1rx\SessionAdmin\SessionAdmin::createUserSesion
-     * @return void
-     */
-    public function testCreateUserSessionSetsExpectedSessionData(): void
+    public function testActivateSessionGeneratesUniqueId(): void
     {
         $admin = $this->getSessionAdminConcrete();
+        $admin->activateSession();
 
-        // $setIsRunningTests = $this->getPrivateMethod($admin, 'setIsRunningTests');
-        // $setIsRunningTests->invoke($admin, true);
-
-        session_start();
-        // $admin->activateSession();
-        $admin->createUserSession(42);
-
-        $this->assertTrue($_SESSION['isUser']);
-        $this->assertSame('you are a user', $_SESSION['msg']);
-        $this->assertSame(42, $_SESSION['id_user']);
-        $this->assertArrayHasKey('uniqueId', $_SESSION);
+        $this->assertArrayHasKey('uniqueId', $_SESSION['sessionadmin']);
+        $this->assertNotEmpty($_SESSION['sessionadmin']['uniqueId']);
+        $this->assertIsString($_SESSION['sessionadmin']['uniqueId']);
     }
 
-    /* ───────────────────────────────
-    SECURITY & IP TESTS
-    ─────────────────────────────── */
-
-    /**
-     * @covers \Seba1rx\SessionAdmin\SessionAdmin::requestIsHijackingAttempt
-     * @return void
-     */
-    public function testRequestIsHijackingAttemptReturnsFalseWhenSessionFresh(): void
+    public function testActivateSessionInjectsConfiguredKeys(): void
     {
-        $admin = $this->getSessionAdminConcrete();
-        // $admin->activateSession();
-        session_start();
-        $_SESSION = [];
-
-        $setIsRunningTests = $this->getPrivateMethod($admin, 'setIsRunningTests');
-        $setIsRunningTests->invoke($admin, true);
-
-        $method = $this->getPrivateMethod($admin, 'requestIsHijackingAttempt');
-        $result = $method->invoke($admin);
-
-        $this->assertFalse($result);
-    }
-
-    /**
-     * @covers \Seba1rx\SessionAdmin\SessionAdmin::getIpPrefix
-     * @return void
-     */
-    public function testGetIpPrefixExtractsCorrectPrefix(): void
-    {
-        $admin = $this->getSessionAdminConcrete();
-
-        // $setIsRunningTests = $this->getPrivateMethod($admin, 'setIsRunningTests');
-        // $setIsRunningTests->invoke($admin, true);
-
-        $method = $this->getPrivateMethod($admin, 'getIpPrefix');
-        $result = $method->invoke($admin, '192.168.1.100', 3);
-        $this->assertSame('192.168.1', $result);
-    }
-
-    /* ───────────────────────────────
-    UTILITY METHOD TESTS
-    ─────────────────────────────── */
-
-    /**
-     * @covers \Seba1rx\SessionAdmin\SessionAdmin::getSubStrAfterLast
-     * @return void
-     */
-    public function testGetSubStrAfterLastReturnsCorrectSegment(): void
-    {
-        $admin = $this->getSessionAdminConcrete();
-
-        // $setIsRunningTests = $this->getPrivateMethod($admin, 'setIsRunningTests');
-        // $setIsRunningTests->invoke($admin, true);
-
-        $getSubStrAfterLast = $this->getPrivateMethod($admin, 'getSubStrAfterLast');
-        $result = $getSubStrAfterLast->invoke($admin, 'folder/subfolder/file.php', '/');
-        $this->assertSame('file.php', $result);
-    }
-
-    /**
-     * @covers \Seba1rx\SessionAdmin\SessionAdmin::strrevpos
-     * @return void
-     */
-    public function testStrrevposFindsReversePosition(): void
-    {
-        $admin = $this->getSessionAdminConcrete();
-
-        // $setIsRunningTests = $this->getPrivateMethod($admin, 'setIsRunningTests');
-        // $setIsRunningTests->invoke($admin, true);
-
-        $method = $this->getPrivateMethod($admin, 'strrevpos');
-        $result = $method->invoke($admin, 'abc/def/ghi', '/');
-        $this->assertIsInt($result);
-        $this->assertGreaterThan(0, $result);
-    }
-
-    /* ───────────────────────────────
-    COOKIE HANDLING TESTS
-    ─────────────────────────────── */
-
-    /**
-     * @covers \Seba1rx\SessionAdmin\SessionAdmin::setCookie
-     * @return void
-     */
-    public function testSetCookieStoresValuesWithExpectedAttributes(): void
-    {
-        $admin = $this->getSessionAdminConcrete();
-
-        // $setIsRunningTests = $this->getPrivateMethod($admin, 'setIsRunningTests');
-        // $setIsRunningTests->invoke($admin, true);
-
-        $method = new \ReflectionMethod($admin, 'setCookie');
-        $method->invoke($admin, 'session_token', 'abc123', 3600, "/", "", false, true);
-
-        $this->assertArrayHasKey('session_token', $admin->cookies);
-        $cookie = $admin->cookies['session_token'];
-        $this->assertSame('abc123', $cookie['value']);
-        $this->assertSame(3600, $cookie['expiresOrOptions']);
-        $this->assertEmpty($cookie['domain']);
-        $this->assertFalse($cookie['secure']);
-        $this->assertTrue($cookie['httponly']);
-    }
-
-    /**
-     * @covers \Seba1rx\SessionAdmin\SessionAdmin::setCookie
-     * @covers \Seba1rx\SessionAdmin\SessionAdmin::getCookie
-     * @return void
-     */
-    public function testGetCookieValueReturnsExistingCookie(): void
-    {
-        $admin = $this->getSessionAdminConcrete();
-
-        // $setIsRunningTests = $this->getPrivateMethod($admin, 'setIsRunningTests');
-        // $setIsRunningTests->invoke($admin, true);
-
-        // prepare reflection method "setCookie"
-        $set_cookie = new \ReflectionMethod($admin, 'setCookie');
-
-        // lets set a cookie in order to try to get it later
-        $set_cookie->invoke($admin, 'testcookie', 'cookie_value', 3600, "/", "", false, true);
-
-        // prepare reflection method "getCookie"
-        $get_cookie = new \ReflectionMethod($admin, 'getCookie');
-
-        // lets get the cookie named testcookie
-        $result = $get_cookie->invoke($admin, 'testcookie');
-        $this->assertSame('cookie_value', $result);
-    }
-
-    /**
-     * @covers \Seba1rx\SessionAdmin\SessionAdmin::getCookie
-     * @return void
-     */
-    public function testGetCookieValueReturnsNullWhenMissing(): void
-    {
-        $admin = $this->getSessionAdminConcrete();
-
-        // $setIsRunningTests = $this->getPrivateMethod($admin, 'setIsRunningTests');
-        // $setIsRunningTests->invoke($admin, true);
-
-        // prepare reflection method "getCookie"
-        $get_cookie = new \ReflectionMethod($admin, 'getCookie');
-
-        // trying to get a cookie that does not exist
-        $result = $get_cookie->invoke($admin, 'missingCookie');
-
-        $this->assertNull($result);
-
-    }
-
-    /* ───────────────────────────────
-    CONFIGURATION INTEGRITY TESTS
-    ─────────────────────────────── */
-
-    /**
-     * @return void
-     */
-    public function testConstructorAppliesConfigurationArray(): void
-    {
-        $config = [
-            'sessionLifetime' => 999,
-            'allowedURLs' => ['index.php', 'contact.php'],
-            'keys' => ['foo' => 'bar', 'lang' => 'en'],
-        ];
-
-        $admin = $this->getSessionAdminConcrete($config);
-
-        // $setIsRunningTests = $this->getPrivateMethod($admin, 'setIsRunningTests');
-        // $setIsRunningTests->invoke($admin, true);
-
-        // Create a ReflectionClass instance
-        $reflection = new \ReflectionClass($admin);
-
-        // Get the protected property
-        $sessionLifetime_property = $reflection->getProperty('sessionLifetime');
-        $allowedUrls_property = $reflection->getProperty('allowedUrls');
-        $keys_property = $reflection->getProperty('keys');
-
-        // Bypass visibility (protected/private)
-        $sessionLifetime_property->setAccessible(true);
-        $allowedUrls_property->setAccessible(true);
-        $keys_property->setAccessible(true);
-
-        // Read the value
-        $sessionLifetime_value = $sessionLifetime_property->getValue($admin);
-        $allowedUrls_value = $allowedUrls_property->getValue($admin);
-        $keys_value = $keys_property->getValue($admin);
-
-        $this->assertSame(999, $sessionLifetime_value);
-        $this->assertSame(['index.php', 'contact.php'], $allowedUrls_value);
-        $this->assertSame(['foo' => 'bar', 'lang' => 'en'], $keys_value);
-    }
-
-    /**
-     * @covers \Seba1rx\SessionAdmin\SessionAdmin::activateSession
-     * @return void
-     */
-    public function testActivateSessionLoadsConfiguredKeys(): void
-    {
-        $config = [
-            'sessionLifetime' => 800,
+        $admin = $this->getSessionAdminConcrete([
             'keys' => ['theme' => 'dark', 'region' => 'us'],
-        ];
-
-        $admin = $this->getSessionAdminConcrete($config);
-        $_SESSION = [];
+        ]);
         $admin->activateSession();
 
-        // $setIsRunningTests = $this->getPrivateMethod($admin, 'setIsRunningTests');
-        // $setIsRunningTests->invoke($admin, true);
-
-        $this->assertArrayHasKey('theme', $_SESSION);
-        $this->assertArrayHasKey('region', $_SESSION);
+        // Custom keys land at the root of $_SESSION, not under 'sessionadmin'
         $this->assertSame('dark', $_SESSION['theme']);
         $this->assertSame('us', $_SESSION['region']);
     }
 
-    /**
-     * @covers \Seba1rx\SessionAdmin\SessionAdmin::activateSession
-     * @return void
-     */
-    public function testActivateSessionWithAuthorizationEnabled(): void
+    public function testActivateSessionInitializesTabManager(): void
     {
-        $config = ['allowedURLs' => ['index.php']];
-        $admin = $this->getSessionAdminConcrete($config);
+        $admin = $this->getSessionAdminConcrete();
+        $admin->useTabIndexation = true;
+        $admin->activateSession();
 
-        // $setIsRunningTests = $this->getPrivateMethod($admin, 'setIsRunningTests');
-        // $setIsRunningTests->invoke($admin, true);
+        $this->assertInstanceOf(TabManager::class, $admin->tabManager);
+    }
 
-        $admin->useAuthorization = true;
-        $admin->app_isSpa = false;
+    public function testActivateSessionSkipsTabManagerWhenDisabled(): void
+    {
+        $admin = $this->getSessionAdminConcrete();
+        $admin->useTabIndexation = false;
+        $admin->activateSession();
 
-        $_SERVER['PHP_SELF'] = '/index.php';
-        $_SESSION = [];
+        $this->assertFalse(isset($admin->tabManager));
+    }
+
+    public function testCreateUserSessionSetsExpectedData(): void
+    {
+        $admin = $this->getSessionAdminConcrete();
+        $admin->activateSession();
+        $admin->createUserSession(42);
+
+        $sa = $_SESSION['sessionadmin'];
+        $this->assertTrue($sa['isUser']);
+        $this->assertSame('you are a user', $sa['msg']);
+        $this->assertSame(42, $sa['id_user']);
+        $this->assertArrayHasKey('uniqueId', $sa);
+        // createUserSession() calls setSessionTimeStamps() — verify timestamps are present
+        $this->assertArrayHasKey('time_atRequest', $sa);
+        $this->assertArrayHasKey('time_sinceLastRequest', $sa);
+        $this->assertIsInt($sa['time_atRequest']);
+        $this->assertGreaterThanOrEqual(0, $sa['time_sinceLastRequest']);
+    }
+
+    public function testCreateUserSessionAcceptsStringId(): void
+    {
+        $admin = $this->getSessionAdminConcrete();
+        $admin->activateSession();
+        $admin->createUserSession('usr-abc');
+
+        $this->assertSame('usr-abc', $_SESSION['sessionadmin']['id_user']);
+    }
+
+    public function testCreateUserSessionDoesNotOverrideUrlIsAllowedToLoad(): void
+    {
+        $admin = $this->getSessionAdminConcrete();
+        $admin->activateSession();
+
+        // Simulate the URL already being marked allowed (e.g. on the login page itself)
+        $_SESSION['sessionadmin']['urlIsAllowedToLoad'] = true;
+
+        $admin->createUserSession(1);
+
+        // createUserSession() must not reset urlIsAllowedToLoad — that is checkIfUrlIsAllowed()'s job
+        $this->assertTrue($_SESSION['sessionadmin']['urlIsAllowedToLoad']);
+    }
+
+    public function testTerminateResetsToGuestSession(): void
+    {
+        $admin = $this->getSessionAdminConcrete();
+        $admin->appIsSpa = true; // SPA mode: no redirect on terminate()
+        $admin->activateSession();
+        $admin->createUserSession(1);
+
+        $this->assertTrue($_SESSION['sessionadmin']['isUser']);
+
+        $admin->terminate();
+
+        $this->assertFalse($_SESSION['sessionadmin']['isUser']);
+        $this->assertSame('you are a guest', $_SESSION['sessionadmin']['msg']);
+    }
+
+    public function testTerminateCallsRedirectInMpaMode(): void
+    {
+        $admin = $this->getSessionAdminConcrete();
+        $admin->appIsSpa          = false;
+        $admin->terminateRedirects = true;
+        $admin->activateSession();
+        $admin->createUserSession(1);
+
+        $admin->terminate();
+
+        $this->assertTrue($admin->redirectCalled);
+    }
+
+    public function testTerminateDoesNotRedirectWhenTerminateRedirectsIsFalse(): void
+    {
+        $admin = $this->getSessionAdminConcrete();
+        $admin->appIsSpa           = false;
+        $admin->terminateRedirects = false;
+        $admin->activateSession();
+        $admin->createUserSession(1);
+
+        $admin->terminate();
+
+        $this->assertFalse($admin->redirectCalled);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // URL AUTHORIZATION
+    // ═══════════════════════════════════════════════════════════════════════
+
+    public function testActivateSessionAllowsListedUrl(): void
+    {
+        $admin = $this->getSessionAdminConcrete(['allowedURLs' => ['index.php']]);
+        $admin->useAuthorization  = true;
+        $admin->appIsSpa          = false;
+        $_SERVER['SCRIPT_NAME']   = '/index.php';
 
         $admin->activateSession();
 
-        //$_SESSION['urlIsAllowedToLoad'] is set to false by default unles $_SERVER['PHP_SELF'] is indeed in "allowedURLs"
-        $this->assertArrayHasKey('urlIsAllowedToLoad', $_SESSION);
-        $this->assertTrue($_SESSION['urlIsAllowedToLoad']);
+        $this->assertTrue($_SESSION['sessionadmin']['urlIsAllowedToLoad']);
+        $this->assertFalse($admin->redirectCalled);
     }
 
-    /**
-     * @return void
-     */
-    public function testConfigurationDefaultsWhenNoValuesProvided(): void
+    public function testActivateSessionBlocksUnlistedUrlAndCallsRedirect(): void
+    {
+        $admin = $this->getSessionAdminConcrete(['allowedURLs' => ['index.php']]);
+        $admin->useAuthorization  = true;
+        $admin->appIsSpa          = false;
+        $_SERVER['SCRIPT_NAME']   = '/secret.php';
+
+        $admin->activateSession();
+
+        $this->assertFalse($_SESSION['sessionadmin']['urlIsAllowedToLoad']);
+        $this->assertTrue($admin->redirectCalled);
+    }
+
+    public function testActivateSessionIgnoresAuthorizationInSpaMode(): void
+    {
+        $admin = $this->getSessionAdminConcrete(['allowedURLs' => ['index.php']]);
+        $admin->useAuthorization  = true;
+        $admin->appIsSpa          = true; // SPA: authorization is never checked
+        $_SERVER['SCRIPT_NAME']   = '/anything.php';
+
+        $admin->activateSession();
+
+        // urlIsAllowedToLoad stays at the guest default (false) and no redirect occurs
+        $this->assertFalse($admin->redirectCalled);
+    }
+
+    public function testActivateSessionIgnoresUrlsInIgnoreList(): void
+    {
+        $admin = $this->getSessionAdminConcrete(['allowedURLs' => ['index.php']]);
+        $admin->useAuthorization      = true;
+        $admin->appIsSpa              = false;
+        $admin->ignoreInAuthorization = ['public.php'];
+        $_SERVER['SCRIPT_NAME']       = '/public.php';
+
+        $admin->activateSession();
+
+        // checkIfUrlIsAllowed() returns early for ignored files; no redirect is triggered
+        $this->assertFalse($admin->redirectCalled);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // STATE CHECKS
+    // ═══════════════════════════════════════════════════════════════════════
+
+    public function testCurrentStateIsUserReturnsFalseForGuest(): void
+    {
+        $admin = $this->getSessionAdminConcrete();
+        $admin->activateSession();
+
+        $result = $this->method($admin, 'currentStateIsUser')->invoke($admin);
+
+        $this->assertFalse($result);
+    }
+
+    public function testCurrentStateIsUserReturnsTrueAfterLogin(): void
+    {
+        $admin = $this->getSessionAdminConcrete();
+        $admin->activateSession();
+        $admin->createUserSession(1);
+
+        $result = $this->method($admin, 'currentStateIsUser')->invoke($admin);
+
+        $this->assertTrue($result);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // SESSION TIMESTAMPS & OBSOLESCENCE
+    // ═══════════════════════════════════════════════════════════════════════
+
+    public function testSetSessionTimeStampsSetsExpectedKeys(): void
+    {
+        session_start();
+        $_SESSION['sessionadmin'] = [];
+
+        $admin = $this->getSessionAdminConcrete();
+        $this->method($admin, 'setSessionTimeStamps')->invoke($admin);
+
+        $sa = $_SESSION['sessionadmin'];
+        $this->assertArrayHasKey('time_atRequest', $sa);
+        $this->assertArrayHasKey('time_sinceLastRequest', $sa);
+        $this->assertIsInt($sa['time_atRequest']);
+        // On first call previous == now, so elapsed is 0 or 1 second
+        $this->assertGreaterThanOrEqual(0, $sa['time_sinceLastRequest']);
+    }
+
+    public function testRequestIsObsoleteReturnsTrueWhenExpired(): void
+    {
+        session_start();
+        $_SESSION['sessionadmin']['time_sinceLastRequest'] = 99999;
+
+        $admin = $this->getSessionAdminConcrete();
+        $result = $this->method($admin, 'requestIsObsolete')->invoke($admin);
+
+        $this->assertTrue($result);
+    }
+
+    public function testRequestIsObsoleteReturnsFalseForFreshSession(): void
+    {
+        session_start();
+        $_SESSION['sessionadmin']['time_sinceLastRequest'] = 1;
+
+        $admin = $this->getSessionAdminConcrete();
+        $result = $this->method($admin, 'requestIsObsolete')->invoke($admin);
+
+        $this->assertFalse($result);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // HIJACKING DETECTION
+    // ═══════════════════════════════════════════════════════════════════════
+
+    public function testRequestIsHijackingAttemptReturnsFalseOnFreshSession(): void
+    {
+        session_start();
+        $_SESSION = [];
+
+        // Fresh session: ipPrefix/userAgent keys are absent → not a hijacking, just record them
+        $admin  = $this->getSessionAdminConcrete();
+        $result = $this->method($admin, 'requestIsHijackingAttempt')->invoke($admin);
+
+        $this->assertFalse($result);
+        // After the call the values must have been stored
+        $this->assertArrayHasKey('ipPrefix', $_SESSION['sessionadmin']);
+        $this->assertArrayHasKey('userAgent', $_SESSION['sessionadmin']);
+    }
+
+    public function testRequestIsHijackingAttemptReturnsFalseForSameIpAndAgent(): void
+    {
+        session_start();
+        // Seed stored values that match the test environment
+        $_SESSION['sessionadmin']['ipPrefix']  = '192.168'; // matches REMOTE_ADDR 192.168.1.100
+        $_SESSION['sessionadmin']['userAgent'] = 'PHPUnit';
+
+        $admin  = $this->getSessionAdminConcrete();
+        $result = $this->method($admin, 'requestIsHijackingAttempt')->invoke($admin);
+
+        $this->assertFalse($result);
+    }
+
+    public function testRequestIsHijackingAttemptReturnsTrueOnIpChange(): void
+    {
+        session_start();
+        $_SESSION['sessionadmin']['ipPrefix']  = '192.168'; // original prefix
+        $_SESSION['sessionadmin']['userAgent'] = 'PHPUnit';
+
+        // Simulate request from a completely different IP
+        $_SERVER['REMOTE_ADDR'] = '10.0.0.5'; // prefix '10.0' → mismatch
+
+        $admin  = $this->getSessionAdminConcrete();
+        $result = $this->method($admin, 'requestIsHijackingAttempt')->invoke($admin);
+
+        $this->assertTrue($result);
+    }
+
+    public function testRequestIsHijackingAttemptReturnsTrueOnUserAgentChange(): void
+    {
+        session_start();
+        $_SESSION['sessionadmin']['ipPrefix']  = '192.168'; // same IP
+        $_SESSION['sessionadmin']['userAgent'] = 'PHPUnit';
+
+        $_SERVER['HTTP_USER_AGENT'] = 'EvilBrowser/1.0';
+
+        $admin  = $this->getSessionAdminConcrete();
+        $result = $this->method($admin, 'requestIsHijackingAttempt')->invoke($admin);
+
+        $this->assertTrue($result);
+    }
+
+    public function testRequestIsHijackingAttemptThrowsOnInvalidOctetRange(): void
+    {
+        session_start();
+        $_SESSION = [];
+
+        $admin                 = $this->getSessionAdminConcrete();
+        $admin->ipOctetsToCheck = 1; // below the valid 2-4 range
+
+        $this->expectException(SessionAdminException::class);
+        $this->method($admin, 'requestIsHijackingAttempt')->invoke($admin);
+    }
+
+    public function testRequestIsHijackingAttemptThrowsWhenOctetsTooHigh(): void
+    {
+        session_start();
+        $_SESSION = [];
+
+        $admin                 = $this->getSessionAdminConcrete();
+        $admin->ipOctetsToCheck = 5; // above the valid 2-4 range
+
+        $this->expectException(SessionAdminException::class);
+        $this->method($admin, 'requestIsHijackingAttempt')->invoke($admin);
+    }
+
+    public function testHijackingAttemptCausesGuestSessionReset(): void
+    {
+        $admin = $this->getSessionAdminConcrete();
+        $admin->activateSession();
+        $admin->createUserSession(99);
+
+        $this->assertTrue($_SESSION['sessionadmin']['isUser']);
+
+        // requestIsHijackingAttempt() stores the fingerprint on its first call.
+        // Seed it here to represent the fingerprint stored on the previous (normal) request.
+        $_SESSION['sessionadmin']['ipPrefix']  = '192.168';
+        $_SESSION['sessionadmin']['userAgent'] = 'PHPUnit';
+
+        // Simulate the next request arriving from a different IP
+        $_SERVER['REMOTE_ADDR'] = '10.0.0.99';
+
+        $this->method($admin, 'checkTime')->invoke($admin);
+
+        $this->assertFalse($_SESSION['sessionadmin']['isUser']);
+        $this->assertSame('you are a guest', $_SESSION['sessionadmin']['msg']);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // IP ADDRESS HELPERS
+    // ═══════════════════════════════════════════════════════════════════════
+
+    public function testGetIpAddressNoProxiesReturnsRemoteAddr(): void
+    {
+        $_SERVER['REMOTE_ADDR'] = '10.0.0.5';
+
+        $admin  = $this->getSessionAdminConcrete();
+        $result = $this->method($admin, 'getIpAddressNoProxies')->invoke($admin);
+
+        $this->assertSame('10.0.0.5', $result);
+    }
+
+    public function testGetIpAddressProxyAwarePrefersForwardedHeader(): void
+    {
+        $_SERVER['HTTP_X_FORWARDED_FOR'] = '203.0.113.50';
+
+        $admin  = $this->getSessionAdminConcrete();
+        $result = $this->method($admin, 'getIpAddressProxyAware')->invoke($admin);
+
+        $this->assertSame('203.0.113.50', $result);
+    }
+
+    public function testGetIpAddressProxyAwareFallsBackToRemoteAddr(): void
+    {
+        // No proxy headers → REMOTE_ADDR is the only source
+        $admin  = $this->getSessionAdminConcrete();
+        $result = $this->method($admin, 'getIpAddressProxyAware')->invoke($admin);
+
+        $this->assertSame('192.168.1.100', $result);
+    }
+
+    public function testGetIpAddressProxyAwareHandlesCommaSeparatedList(): void
+    {
+        // First IP in the list is the client
+        $_SERVER['HTTP_X_FORWARDED_FOR'] = '198.51.100.1, 10.0.0.1, 10.0.0.2';
+
+        $admin  = $this->getSessionAdminConcrete();
+        $result = $this->method($admin, 'getIpAddressProxyAware')->invoke($admin);
+
+        $this->assertSame('198.51.100.1', $result);
+    }
+
+    public function testGetIpPrefixExtracts2Octets(): void
+    {
+        $admin  = $this->getSessionAdminConcrete();
+        $result = $this->method($admin, 'getIpPrefix')->invoke($admin, '192.168.1.100', 2);
+
+        $this->assertSame('192.168', $result);
+    }
+
+    public function testGetIpPrefixExtracts3Octets(): void
+    {
+        $admin  = $this->getSessionAdminConcrete();
+        $result = $this->method($admin, 'getIpPrefix')->invoke($admin, '192.168.1.100', 3);
+
+        $this->assertSame('192.168.1', $result);
+    }
+
+    public function testGetIpPrefixExtracts4Octets(): void
+    {
+        $admin  = $this->getSessionAdminConcrete();
+        $result = $this->method($admin, 'getIpPrefix')->invoke($admin, '192.168.1.100', 4);
+
+        $this->assertSame('192.168.1.100', $result);
+    }
+
+    public function testGetIpPrefixHandlesIPv6(): void
+    {
+        $admin  = $this->getSessionAdminConcrete();
+        $result = $this->method($admin, 'getIpPrefix')->invoke($admin, '2001:db8::1', 2);
+
+        $this->assertSame('2001:db8', $result);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // STRING UTILITIES
+    // ═══════════════════════════════════════════════════════════════════════
+
+    public function testGetSubStrAfterLastReturnsSegmentAfterLastSlash(): void
+    {
+        $admin  = $this->getSessionAdminConcrete();
+        $result = $this->method($admin, 'getSubStrAfterLast')
+            ->invoke($admin, 'folder/subfolder/file.php', '/');
+
+        $this->assertSame('file.php', $result);
+    }
+
+    public function testGetSubStrAfterLastReturnsSegmentAfterLastDot(): void
+    {
+        $admin  = $this->getSessionAdminConcrete();
+        $result = $this->method($admin, 'getSubStrAfterLast')
+            ->invoke($admin, 'a.b.c.extension', '.');
+
+        $this->assertSame('extension', $result);
+    }
+
+    public function testGetSubStrAfterLastReturnsOriginalStringWhenNeedleAbsent(): void
+    {
+        $admin  = $this->getSessionAdminConcrete();
+        $result = $this->method($admin, 'getSubStrAfterLast')
+            ->invoke($admin, 'nodots', '/');
+
+        $this->assertSame('nodots', $result);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // COOKIE WRAPPER
+    // ═══════════════════════════════════════════════════════════════════════
+
+    public function testSetCookieStoresAllAttributes(): void
+    {
+        $admin = $this->getSessionAdminConcrete();
+        $this->method($admin, 'setCookie')
+            ->invoke($admin, 'session_token', 'abc123', 3600, '/', '', false, true);
+
+        $this->assertArrayHasKey('session_token', $admin->cookies);
+        $c = $admin->cookies['session_token'];
+        $this->assertSame('abc123', $c['value']);
+        $this->assertSame(3600, $c['expiresOrOptions']);
+        $this->assertSame('/', $c['path']);
+        $this->assertEmpty($c['domain']);
+        $this->assertFalse($c['secure']);
+        $this->assertTrue($c['httponly']);
+    }
+
+    public function testGetCookieReturnsValuePreviouslySet(): void
+    {
+        $admin = $this->getSessionAdminConcrete();
+        $this->method($admin, 'setCookie')->invoke($admin, 'tok', 'val123', 3600, '/', '', false, true);
+
+        $result = $this->method($admin, 'getCookie')->invoke($admin, 'tok');
+
+        $this->assertSame('val123', $result);
+    }
+
+    public function testGetCookieReturnsNullForMissingCookie(): void
+    {
+        $admin  = $this->getSessionAdminConcrete();
+        $result = $this->method($admin, 'getCookie')->invoke($admin, 'missing');
+
+        $this->assertNull($result);
+    }
+
+    public function testGetCookieReturnsCustomDefaultForMissingCookie(): void
+    {
+        $admin  = $this->getSessionAdminConcrete();
+        $result = $this->method($admin, 'getCookie')->invoke($admin, 'missing', 'fallback');
+
+        $this->assertSame('fallback', $result);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // CONFIGURATION
+    // ═══════════════════════════════════════════════════════════════════════
+
+    public function testConstructorAppliesAllConfigValues(): void
+    {
+        $config = [
+            'sessionLifetime' => 999,
+            'allowedURLs'     => ['index.php', 'contact.php'],
+            'keys'            => ['foo' => 'bar', 'lang' => 'en'],
+        ];
+
+        $admin = $this->getSessionAdminConcrete($config);
+        $rc    = new \ReflectionClass($admin);
+
+        $this->assertSame(999, $rc->getProperty('sessionLifetime')->getValue($admin));
+        $this->assertSame(['index.php', 'contact.php'], $rc->getProperty('allowedUrls')->getValue($admin));
+        $this->assertSame(['foo' => 'bar', 'lang' => 'en'], $rc->getProperty('keys')->getValue($admin));
+    }
+
+    public function testDefaultConfigurationValues(): void
+    {
+        $admin = $this->getSessionAdminConcrete();
+        $rc    = new \ReflectionClass($admin);
+
+        $this->assertSame(2400, $rc->getProperty('sessionLifetime')->getValue($admin));
+        $this->assertSame('SESSION', $rc->getProperty('sessionName')->getValue($admin));
+        $this->assertSame('/', $rc->getProperty('path')->getValue($admin));
+        $this->assertNull($rc->getProperty('domain')->getValue($admin));
+        $this->assertNull($rc->getProperty('secure')->getValue($admin));
+    }
+
+    public function testPublicFlagDefaults(): void
     {
         $admin = $this->getSessionAdminConcrete();
 
-        // $setIsRunningTests = $this->getPrivateMethod($admin, 'setIsRunningTests');
-        // $setIsRunningTests->invoke($admin, true);
-
-        // we will need to access some protected properties, so Reflexion is needed
-
-        // Create a ReflectionClass instance
-        $reflection = new \ReflectionClass($admin);
-
-        // Get the protected property
-        $sessionLifetime_property = $reflection->getProperty('sessionLifetime');
-        $sessionName_property = $reflection->getProperty('sessionName');
-        $path_property = $reflection->getProperty('path');
-        $domain_property = $reflection->getProperty('domain');
-        $secure_property = $reflection->getProperty('secure');
-
-        // Bypass visibility (protected/private)
-        $sessionLifetime_property->setAccessible(true);
-        $sessionName_property->setAccessible(true);
-        $path_property->setAccessible(true);
-        $domain_property->setAccessible(true);
-        $secure_property->setAccessible(true);
-
-        // Read the value
-        $sessionLifetime_value = $sessionLifetime_property->getValue($admin);
-        $sessionName_value = $sessionName_property->getValue($admin);
-        $path_value = $path_property->getValue($admin);
-        $domain_value = $domain_property->getValue($admin);
-        $secure_value = $secure_property->getValue($admin);
-
-        $this->assertSame(2400, $sessionLifetime_value);
-        $this->assertSame('SESSION', $sessionName_value);
-        $this->assertSame('/', $path_value);
-        $this->assertNull($domain_value);
-        $this->assertNull($secure_value);
+        $this->assertTrue($admin->appIsSpa);
+        $this->assertFalse($admin->useAuthorization);
+        $this->assertTrue($admin->useTabIndexation);
+        $this->assertTrue($admin->proxyAwareIpDetection);
+        $this->assertSame(2, $admin->ipOctetsToCheck);
+        $this->assertSame([], $admin->ignoreInAuthorization);
+        $this->assertTrue($admin->terminateRedirects);
     }
 
-    /* ───────────────────────────────
-    HELPER METHOD
-    ─────────────────────────────── */
+    // ═══════════════════════════════════════════════════════════════════════
+    // CONTRACTS
+    // ═══════════════════════════════════════════════════════════════════════
 
-    private function getPrivateMethod(object $object, string $methodName): \ReflectionMethod
+    /**
+     * SessionAdmin must implement SessionInterface so consumers can type-hint
+     * the contract instead of the concrete class.
+     */
+    public function testSessionAdminImplementsSessionInterface(): void
     {
-        $method = new \ReflectionMethod($object::class, $methodName);
-        $method->setAccessible(true);
-        return $method;
+        $admin = $this->getSessionAdminConcrete();
+
+        $this->assertInstanceOf(SessionInterface::class, $admin);
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // CUSTOM SESSION HANDLER
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /**
+     * setSessionHandler() must register the given handler so PHP calls it
+     * when the session is started via activateSession().
+     */
+    public function testSetSessionHandlerIsCalledDuringActivateSession(): void
+    {
+        $opened = false;
+
+        $handler = new class($opened) implements \SessionHandlerInterface {
+            /** @param bool $opened Passed by reference; set to true on open(). */
+            public function __construct(private bool &$opened) {}
+
+            /** @inheritDoc */
+            public function open(string $path, string $name): bool
+            {
+                $this->opened = true;
+                return true;
+            }
+
+            /** @inheritDoc */
+            public function close(): bool { return true; }
+
+            /** @inheritDoc */
+            public function read(string $id): string|false { return ''; }
+
+            /** @inheritDoc */
+            public function write(string $id, string $data): bool { return true; }
+
+            /** @inheritDoc */
+            public function destroy(string $id): bool { return true; }
+
+            /** @inheritDoc */
+            public function gc(int $max_lifetime): int|false { return 0; }
+        };
+
+        $admin = $this->getSessionAdminConcrete();
+        $admin->setSessionHandler($handler);
+        $admin->activateSession();
+
+        $this->assertTrue($opened, 'Custom session handler open() was not called during activateSession()');
+
+        // Restore the native handler so subsequent tests are not affected.
+        session_write_close();
+        session_set_save_handler(new \SessionHandler());
+    }
+
+    /**
+     * setSessionHandler() must accept any SessionHandlerInterface without
+     * throwing, even when called before activateSession().
+     */
+    public function testSetSessionHandlerAcceptsValidHandlerWithoutThrowing(): void
+    {
+        $handler = new class implements \SessionHandlerInterface {
+            /** @inheritDoc */
+            public function open(string $path, string $name): bool { return true; }
+
+            /** @inheritDoc */
+            public function close(): bool { return true; }
+
+            /** @inheritDoc */
+            public function read(string $id): string|false { return ''; }
+
+            /** @inheritDoc */
+            public function write(string $id, string $data): bool { return true; }
+
+            /** @inheritDoc */
+            public function destroy(string $id): bool { return true; }
+
+            /** @inheritDoc */
+            public function gc(int $max_lifetime): int|false { return 0; }
+        };
+
+        $admin = $this->getSessionAdminConcrete();
+
+        // Must not throw
+        $admin->setSessionHandler($handler);
+
+        $this->assertTrue(true);
+
+        // Restore native handler.
+        session_set_save_handler(new \SessionHandler());
     }
 }

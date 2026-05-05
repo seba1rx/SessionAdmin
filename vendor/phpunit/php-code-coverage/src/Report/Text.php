@@ -17,20 +17,25 @@ use function max;
 use function sprintf;
 use function str_pad;
 use function strlen;
-use SebastianBergmann\CodeCoverage\CodeCoverage;
+use SebastianBergmann\CodeCoverage\Node\Directory;
 use SebastianBergmann\CodeCoverage\Node\File;
 use SebastianBergmann\CodeCoverage\Util\Percentage;
 
-final class Text
+/**
+ * @internal This class is not covered by the backward compatibility promise for phpunit/php-code-coverage
+ *
+ * @no-named-arguments Parameter names are not covered by the backward compatibility promise for phpunit/php-code-coverage
+ */
+final readonly class Text
 {
     private const string COLOR_GREEN  = "\x1b[30;42m";
     private const string COLOR_YELLOW = "\x1b[30;43m";
     private const string COLOR_RED    = "\x1b[37;41m";
     private const string COLOR_HEADER = "\x1b[1;37;40m";
     private const string COLOR_RESET  = "\x1b[0m";
-    private readonly Thresholds $thresholds;
-    private readonly bool $showUncoveredFiles;
-    private readonly bool $showOnlySummary;
+    private Thresholds $thresholds;
+    private bool $showUncoveredFiles;
+    private bool $showOnlySummary;
 
     public function __construct(Thresholds $thresholds, bool $showUncoveredFiles = false, bool $showOnlySummary = false)
     {
@@ -39,12 +44,11 @@ final class Text
         $this->showOnlySummary    = $showOnlySummary;
     }
 
-    public function process(CodeCoverage $coverage, bool $showColors = false): string
+    public function process(Directory $report, bool $showColors = false): string
     {
-        $hasBranchCoverage = $coverage->getData(true)->functionCoverage() !== [];
+        $hasBranchCoverage = $report->numberOfExecutableBranches() > 0;
 
         $output = PHP_EOL . PHP_EOL;
-        $report = $coverage->getReport();
 
         $colors = [
             'header'   => '',
@@ -141,7 +145,7 @@ final class Text
             $report->numberOfExecutableLines(),
         );
 
-        $padding = max(array_map('strlen', [$classes, $methods, $lines]));
+        $padding = max(array_map(strlen(...), [$classes, $methods, $lines]));
 
         if ($this->showOnlySummary) {
             $title   = 'Code Coverage Report Summary:';
@@ -164,6 +168,17 @@ final class Text
         if ($hasBranchCoverage) {
             $output .= $this->format($colors['paths'], $padding, $paths);
             $output .= $this->format($colors['branches'], $padding, $branches);
+
+            $numFilesWithoutBranchCoverageData = $report->numberOfFilesWithoutBranchCoverageData();
+
+            if ($numFilesWithoutBranchCoverageData > 0) {
+                $output .= sprintf(
+                    '  * %d %s not loaded during test execution and no branch/path data is available for %s' . PHP_EOL,
+                    $numFilesWithoutBranchCoverageData,
+                    $numFilesWithoutBranchCoverageData === 1 ? 'file was' : 'files were',
+                    $numFilesWithoutBranchCoverageData === 1 ? 'it' : 'them',
+                );
+            }
         }
         $output .= $this->format($colors['lines'], $padding, $lines);
 
@@ -190,28 +205,28 @@ final class Text
                 $coveredMethods          = 0;
                 $classMethods            = 0;
 
-                foreach ($class['methods'] as $method) {
+                foreach ($class->methods as $method) {
                     /** @phpstan-ignore equal.notAllowed */
-                    if ($method['executableLines'] == 0) {
+                    if ($method->executableLines == 0) {
                         continue;
                     }
 
                     $classMethods++;
-                    $classExecutableLines    += $method['executableLines'];
-                    $classExecutedLines      += $method['executedLines'];
-                    $classExecutableBranches += $method['executableBranches'];
-                    $classExecutedBranches   += $method['executedBranches'];
-                    $classExecutablePaths    += $method['executablePaths'];
-                    $classExecutedPaths      += $method['executedPaths'];
+                    $classExecutableLines    += $method->executableLines;
+                    $classExecutedLines      += $method->executedLines;
+                    $classExecutableBranches += $method->executableBranches;
+                    $classExecutedBranches   += $method->executedBranches;
+                    $classExecutablePaths    += $method->executablePaths;
+                    $classExecutedPaths      += $method->executedPaths;
 
                     /** @phpstan-ignore equal.notAllowed */
-                    if ($method['coverage'] == 100) {
+                    if ($method->coverage == 100) {
                         $coveredMethods++;
                     }
                 }
 
                 $classCoverage[$className] = [
-                    'namespace'         => $class['namespace'],
+                    'namespace'         => $class->namespace,
                     'className'         => $className,
                     'methodsCovered'    => $coveredMethods,
                     'methodCount'       => $classMethods,
