@@ -10,6 +10,7 @@ These rules apply to every change, no matter how small:
 - **Demo review** — review each demo in `demo/` and update if the change affects configuration, method signatures, or visible behaviour.
 - **Tests and coverage** — every new public method and every significant behaviour change must have corresponding PHPUnit test cases. Run `composer test` before committing. Run `composer coverage` to verify coverage is not regressing.
 - **Docblocks required** — every class, interface, property, and method must have a PHPDoc comment. Use `@param`, `@return`, and `@throws` tags. Implementations that inherit the interface docblock may omit redundant tags, but must not omit the docblock entirely.
+- **Commit message** — at the end of every task that produced code changes, provide a ready-to-copy `git commit -m` suggestion. One subject line (≤72 chars, imperative mood), optional body bullet points for non-obvious details. Do not commit — just print the message.
 
 ## Commands
 
