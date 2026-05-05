@@ -164,19 +164,25 @@ abstract class Session{
     }
 
     /**
-     * Updates the session cookie lifetime and configures cookie parameters before session start.
+     * Refreshes the session cookie lifetime and configures cookie parameters.
      *
-     * Refreshes the cookie expiry on every request so active users are not logged out.
-     * Cookie params (lifetime, path, domain, secure, httponly) are only set before
-     * the session is started; calling session_set_cookie_params() after session_start()
-     * has no effect.
+     * When the session is already active (e.g. called from createUserSession() after
+     * session_regenerate_id()), session_id() is used so the refreshed cookie carries
+     * the current — possibly regenerated — session ID. Using the old request cookie
+     * value ($_COOKIE) after regeneration would send a stale ID and cause the browser
+     * to revert to the old session on the next request.
+     *
+     * session_set_cookie_params() is only effective before session_start(); calling it
+     * on an already-active session has no effect, so it is guarded accordingly.
      *
      * @return void
      */
     protected function setSessionTime(): void
     {
-        if (isset($_COOKIE[$this->sessionName])) {
-            $this->setCookie($this->sessionName, $_COOKIE[$this->sessionName], time() + $this->sessionLifetime, '/');
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            $this->setCookie($this->sessionName, session_id(), time() + $this->sessionLifetime, '/');
+        } elseif ($this->getCookie($this->sessionName) !== null) {
+            $this->setCookie($this->sessionName, (string) $this->getCookie($this->sessionName), time() + $this->sessionLifetime, '/');
         }
 
         if (session_status() !== PHP_SESSION_ACTIVE) {
@@ -194,12 +200,9 @@ abstract class Session{
      */
     protected function setSessionTimeStamps(): void
     {
-        $time = time();
-        $previous = time();
-        if(isset($_SESSION['sessionadmin']['time_atRequest'])){
-            $previous = $_SESSION['sessionadmin']['time_atRequest'];
-        }
-        $_SESSION['sessionadmin']['time_atRequest'] = $time;
+        $time     = time();
+        $previous = $_SESSION['sessionadmin']['time_atRequest'] ?? $time;
+        $_SESSION['sessionadmin']['time_atRequest']        = $time;
         $_SESSION['sessionadmin']['time_sinceLastRequest'] = $time - $previous;
     }
 
@@ -210,7 +213,7 @@ abstract class Session{
      */
     protected function requestIsObsolete(): bool
     {
-        return ($_SESSION['sessionadmin']['time_sinceLastRequest'] > $this->sessionLifetime ? TRUE : FALSE);
+        return $_SESSION['sessionadmin']['time_sinceLastRequest'] > $this->sessionLifetime;
     }
 
     /**
@@ -226,7 +229,7 @@ abstract class Session{
         $_SESSION['sessionadmin']['urlIsAllowedToLoad'] = FALSE;
         $url_to_check = basename($_SERVER['SCRIPT_NAME'] ?? $_SERVER['PHP_SELF'] ?? '');
 
-        if(in_array($url_to_check, $this->ignoreInAuthorization)){
+        if(\in_array($url_to_check, $this->ignoreInAuthorization)){
             return;
         }
 
@@ -340,12 +343,12 @@ abstract class Session{
     {
         if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
             $chunks = explode('.', $ip);
-            return implode('.', array_slice($chunks, 0, $parts));
+            return implode('.', \array_slice($chunks, 0, $parts));
         }
 
         if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) {
             $chunks = explode(':', $ip);
-            return implode(':', array_slice($chunks, 0, $parts));
+            return implode(':', \array_slice($chunks, 0, $parts));
         }
 
         return $ip;
@@ -400,7 +403,7 @@ abstract class Session{
     protected function getSubStrAfterLast(string $haystack, string $needle): string
     {
         $pos = strrpos($haystack, $needle);
-        return $pos !== false ? substr($haystack, $pos + strlen($needle)) : $haystack;
+        return $pos !== false ? substr($haystack, $pos + \strlen($needle)) : $haystack;
     }
 
     /**
@@ -429,11 +432,7 @@ abstract class Session{
         }
 
         $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
-        if ($method === 'POST' || $method === 'PUT' || $method === 'DELETE') {
-            $status = 307;
-        } else {
-            $status = 303;
-        }
+        $status = ($method === 'POST' || $method === 'PUT' || $method === 'DELETE') ? 307 : 303;
 
         if (!headers_sent()) {
             header("Location: {$url}", true, $status);

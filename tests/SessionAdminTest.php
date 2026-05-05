@@ -241,6 +241,24 @@ class SessionAdminTest extends TestCase
         $this->assertFalse(isset($admin->tabManager));
     }
 
+    public function testCreateUserSessionCookieUsesRegeneratedSessionId(): void
+    {
+        // Regression test: after createUserSession() calls session_regenerate_id(),
+        // the setSessionTime() call must write the NEW session ID to the cookie,
+        // not the old request-cookie value. Writing the old ID would cause the
+        // browser to override PHP's Set-Cookie from session_regenerate_id() and
+        // revert to the old (guest) session on the next request.
+        $admin = $this->getSessionAdminConcrete();
+        $admin->activateSession();
+        $admin->createUserSession(42);
+
+        $rc          = new \ReflectionClass($admin);
+        $sessionName = $rc->getProperty('sessionName')->getValue($admin);
+
+        $this->assertArrayHasKey($sessionName, $admin->cookies);
+        $this->assertSame(session_id(), $admin->cookies[$sessionName]['value']);
+    }
+
     public function testCreateUserSessionSetsExpectedData(): void
     {
         $admin = $this->getSessionAdminConcrete();
