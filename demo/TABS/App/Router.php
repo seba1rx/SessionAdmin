@@ -29,12 +29,17 @@ class Router
             } else {
                 http_response_code(500);
                 return ["error" => "Controller or method not found: {$class}::{$action}"];
-                exit;
             }
         }
 
-        // If not matched
-        // http_response_code(404);
+        // GET requests that don't match a specific route serve the app root —
+        // standard SPA fallback so any bookmarked or directly typed URL loads the app.
+        if ($method === 'GET') {
+            $controller = new \App\Controller();
+            return $controller->start(new Request);
+        }
+
+        http_response_code(404);
         return ["error" => "404 Not Found: {$method} {$uri}"];
     }
 }

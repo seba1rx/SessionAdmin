@@ -4,15 +4,12 @@ namespace App;
 
 use Seba1rx\SessionAdmin\SessionAdmin;
 
-/**
- * Advanced demo — SPA with per-tab session isolation.
- *
- * Extend SessionAdmin and define a constructor that configures the session.
- *
- * @param array $conf  Keys: sessionLifetime, allowedURLs, keys
- */
+/** Advanced demo — SPA with per-tab session isolation via TabManager. */
 class MyTABSessionAdmin extends SessionAdmin
 {
+    /**
+     * @param array $conf  Keys: sessionLifetime, allowedURLs, keys
+     */
     public function __construct(array $conf = [])
     {
         $this->sessionName = 'MyCustomTABSessionName';

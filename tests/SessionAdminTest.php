@@ -201,6 +201,25 @@ class SessionAdminTest extends TestCase
         $this->assertSame('abc123preserved', $_SESSION['sessionadmin']['uniqueId']);
     }
 
+    public function testConfigureGuestSessionPreservesExistingTabs(): void
+    {
+        session_start();
+        $existingTabs = [
+            'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee' => [
+                'data'        => ['cart' => ['item' => 1]],
+                'is_active'   => true,
+                'last_active' => 1700000000,
+            ],
+        ];
+        $_SESSION['tabs'] = $existingTabs;
+        $_SESSION['sessionadmin'] = [];
+
+        $admin = $this->getSessionAdminConcrete();
+        $this->method($admin, 'configureGuestSession')->invoke($admin);
+
+        $this->assertSame($existingTabs, $_SESSION['tabs']);
+    }
+
     public function testActivateSessionGeneratesUniqueId(): void
     {
         $admin = $this->getSessionAdminConcrete();

@@ -135,6 +135,7 @@ abstract class Session{
     protected function configureGuestSession(): void
     {
         $existingUniqueId = $_SESSION['sessionadmin']['uniqueId'] ?? null;
+        $existingTabs     = $_SESSION['tabs'] ?? null;
 
         $_SESSION = [];
         $_SESSION['sessionadmin'] = [];
@@ -143,6 +144,10 @@ abstract class Session{
 
         if ($existingUniqueId !== null) {
             $_SESSION['sessionadmin']['uniqueId'] = $existingUniqueId;
+        }
+
+        if ($existingTabs !== null) {
+            $_SESSION['tabs'] = $existingTabs;
         }
 
         if (!$this->appIsSpa) {
