@@ -86,6 +86,24 @@ if (!empty($_SESSION['sessionadmin']['isUser'])) {
 
 The full class is documented via docblocks — your IDE will surface every property and its purpose.
 
+### Session data written to `$_SESSION['sessionadmin']`
+
+| Key | Present | Description |
+|---|---|---|
+| `appType` | Always | `'SPA'` or `'MPA'` — reflects the `$appIsSpa` flag |
+| `isUser` | Always | `true` when authenticated, `false` for guests |
+| `id_user` | After login | Value passed to `createUserSession()` |
+| `msg` | Always | Human-readable state label |
+| `uniqueId` | Always | 12-char hex token, stable for the session lifetime |
+| `ipPrefix` | Always | First N octets of the client IP (hijacking detection) |
+| `userAgent` | Always | User-Agent string (hijacking detection) |
+| `time_atRequest` | Always | Unix timestamp of the last request |
+| `time_sinceLastRequest` | Always | Seconds elapsed since the previous request |
+| `allowedUrl` | **MPA only** | Copy of `$allowedUrls` used for URL authorization |
+| `urlIsAllowedToLoad` | **MPA only** | `true` when the current URL is in the allow-list |
+
+`allowedUrl` and `urlIsAllowedToLoad` are omitted entirely in SPA mode — they only make sense when URL authorization is active.
+
 ---
 
 ## Custom session storage

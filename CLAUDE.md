@@ -76,11 +76,12 @@ Session  (abstract)                       TabManager
 ```
 $_SESSION
 ├── sessionadmin/
+│   ├── appType             string — 'SPA' | 'MPA' (always present)
 │   ├── isUser              bool   — true for authenticated users
 │   ├── id_user             mixed  — value passed to createUserSession()
 │   ├── msg                 string — 'you are a user' | 'you are a guest'
-│   ├── allowedUrl          array  — copy of $allowedUrls
-│   ├── urlIsAllowedToLoad  bool
+│   ├── allowedUrl          array  — copy of $allowedUrls  (MPA only)
+│   ├── urlIsAllowedToLoad  bool                           (MPA only)
 │   ├── uniqueId            string — 12-char hex, stable for session lifetime
 │   ├── ipPrefix            string — first N octets of client IP
 │   ├── userAgent           string

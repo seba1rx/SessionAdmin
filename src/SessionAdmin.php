@@ -99,6 +99,8 @@ abstract class SessionAdmin extends Session implements SessionInterface
             $this->configureGuestSession();
         }
 
+        $_SESSION['sessionadmin']['appType'] = $this->appIsSpa ? 'SPA' : 'MPA';
+
         if (!isset($_SESSION['sessionadmin']['uniqueId'])) {
             $this->uniqueId = bin2hex(random_bytes(6));
             $_SESSION['sessionadmin']['uniqueId'] = $this->uniqueId;

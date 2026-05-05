@@ -124,8 +124,52 @@ class SessionAdminTest extends TestCase
         $sa = $_SESSION['sessionadmin'];
         $this->assertFalse($sa['isUser']);
         $this->assertSame('you are a guest', $sa['msg']);
+        $this->assertSame('SPA', $sa['appType']);                          // default is SPA
+        $this->assertArrayNotHasKey('allowedUrl', $sa);                   // MPA-only keys absent
+        $this->assertArrayNotHasKey('urlIsAllowedToLoad', $sa);
+    }
+
+    public function testGuestSessionInSpaDoesNotHaveAuthorizationKeys(): void
+    {
+        $admin = $this->getSessionAdminConcrete();
+        $admin->appIsSpa = true;
+        $admin->activateSession();
+
+        $sa = $_SESSION['sessionadmin'];
+        $this->assertSame('SPA', $sa['appType']);
+        $this->assertArrayNotHasKey('allowedUrl', $sa);
+        $this->assertArrayNotHasKey('urlIsAllowedToLoad', $sa);
+    }
+
+    public function testGuestSessionInMpaHasAuthorizationKeys(): void
+    {
+        $admin = $this->getSessionAdminConcrete(['allowedURLs' => ['index.php']]);
+        $admin->appIsSpa = false;
+        $admin->activateSession();
+
+        $sa = $_SESSION['sessionadmin'];
+        $this->assertSame('MPA', $sa['appType']);
         $this->assertArrayHasKey('allowedUrl', $sa);
+        $this->assertArrayHasKey('urlIsAllowedToLoad', $sa);
         $this->assertFalse($sa['urlIsAllowedToLoad']);
+    }
+
+    public function testAppTypeIsUpdatedOnEveryActivation(): void
+    {
+        $admin = $this->getSessionAdminConcrete();
+        $admin->appIsSpa = true;
+        $admin->activateSession();
+        $this->assertSame('SPA', $_SESSION['sessionadmin']['appType']);
+
+        // Simulate a subsequent request where app switches mode (edge case)
+        session_write_close();
+        session_id(bin2hex(random_bytes(16)));
+        $_SESSION = [];
+
+        $admin2 = $this->getSessionAdminConcrete();
+        $admin2->appIsSpa = false;
+        $admin2->activateSession();
+        $this->assertSame('MPA', $_SESSION['sessionadmin']['appType']);
     }
 
     public function testActivateSessionGeneratesUniqueId(): void
@@ -197,11 +241,15 @@ class SessionAdminTest extends TestCase
 
     public function testCreateUserSessionDoesNotOverrideUrlIsAllowedToLoad(): void
     {
-        $admin = $this->getSessionAdminConcrete();
+        // urlIsAllowedToLoad only exists in MPA mode; test in that context.
+        $admin = $this->getSessionAdminConcrete(['allowedURLs' => ['index.php']]);
+        $admin->appIsSpa         = false;
+        $admin->useAuthorization = true;
+        $_SERVER['SCRIPT_NAME']  = '/index.php';
         $admin->activateSession();
 
         // Simulate the URL already being marked allowed (e.g. on the login page itself)
-        $_SESSION['sessionadmin']['urlIsAllowedToLoad'] = true;
+        $this->assertTrue($_SESSION['sessionadmin']['urlIsAllowedToLoad']);
 
         $admin->createUserSession(1);
 
@@ -289,8 +337,9 @@ class SessionAdminTest extends TestCase
 
         $admin->activateSession();
 
-        // urlIsAllowedToLoad stays at the guest default (false) and no redirect occurs
+        // SPA mode skips URL checks entirely — no redirect and no MPA keys in session
         $this->assertFalse($admin->redirectCalled);
+        $this->assertArrayNotHasKey('urlIsAllowedToLoad', $_SESSION['sessionadmin']);
     }
 
     public function testActivateSessionIgnoresUrlsInIgnoreList(): void

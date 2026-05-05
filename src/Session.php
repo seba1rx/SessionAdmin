@@ -122,7 +122,10 @@ abstract class Session{
     }
 
     /**
-     * Configure $_SESSION with guest data which is the minimum data to use the website
+     * Configure $_SESSION with guest data which is the minimum data to use the website.
+     *
+     * URL authorization keys (allowedUrl, urlIsAllowedToLoad) are only written for
+     * MPA apps — they are meaningless and confusing when $appIsSpa is true.
      *
      * @return void
      */
@@ -130,10 +133,13 @@ abstract class Session{
     {
         $_SESSION = [];
         $_SESSION['sessionadmin'] = [];
-        $_SESSION['sessionadmin']['isUser'] = FALSE;
+        $_SESSION['sessionadmin']['isUser'] = false;
         $_SESSION['sessionadmin']['msg'] = 'you are a guest';
-        $_SESSION['sessionadmin']['allowedUrl'] = $this->allowedUrls;
-        $_SESSION['sessionadmin']['urlIsAllowedToLoad'] = FALSE;
+
+        if (!$this->appIsSpa) {
+            $_SESSION['sessionadmin']['allowedUrl'] = $this->allowedUrls;
+            $_SESSION['sessionadmin']['urlIsAllowedToLoad'] = false;
+        }
     }
 
     /**
