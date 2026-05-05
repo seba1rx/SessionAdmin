@@ -172,6 +172,35 @@ class SessionAdminTest extends TestCase
         $this->assertSame('MPA', $_SESSION['sessionadmin']['appType']);
     }
 
+    public function testGuestUniqueIdPersistsAcrossSubsequentRequests(): void
+    {
+        $admin = $this->getSessionAdminConcrete();
+        $admin->activateSession();
+
+        $uniqueId = $_SESSION['sessionadmin']['uniqueId'];
+        $this->assertNotEmpty($uniqueId);
+
+        // Simulate next guest request: configureGuestSession() wipes and rebuilds the session
+        $this->method($admin, 'configureGuestSession')->invoke($admin);
+
+        $this->assertSame(
+            $uniqueId,
+            $_SESSION['sessionadmin']['uniqueId'],
+            'uniqueId must survive configureGuestSession() so it is stable across guest requests'
+        );
+    }
+
+    public function testConfigureGuestSessionPreservesExistingUniqueId(): void
+    {
+        session_start();
+        $_SESSION['sessionadmin'] = ['uniqueId' => 'abc123preserved'];
+
+        $admin = $this->getSessionAdminConcrete();
+        $this->method($admin, 'configureGuestSession')->invoke($admin);
+
+        $this->assertSame('abc123preserved', $_SESSION['sessionadmin']['uniqueId']);
+    }
+
     public function testActivateSessionGeneratesUniqueId(): void
     {
         $admin = $this->getSessionAdminConcrete();
@@ -760,7 +789,7 @@ class SessionAdminTest extends TestCase
             public function __construct(private bool &$opened) {}
 
             /** @inheritDoc */
-            public function open(string $path, string $name): bool
+            public function open(string $_path, string $_name): bool
             {
                 $this->opened = true;
                 return true;
@@ -770,16 +799,16 @@ class SessionAdminTest extends TestCase
             public function close(): bool { return true; }
 
             /** @inheritDoc */
-            public function read(string $id): string|false { return ''; }
+            public function read(string $_id): string|false { return ''; }
 
             /** @inheritDoc */
-            public function write(string $id, string $data): bool { return true; }
+            public function write(string $_id, string $_data): bool { return true; }
 
             /** @inheritDoc */
-            public function destroy(string $id): bool { return true; }
+            public function destroy(string $_id): bool { return true; }
 
             /** @inheritDoc */
-            public function gc(int $max_lifetime): int|false { return 0; }
+            public function gc(int $_max_lifetime): int|false { return 0; }
         };
 
         $admin = $this->getSessionAdminConcrete();
@@ -801,22 +830,22 @@ class SessionAdminTest extends TestCase
     {
         $handler = new class implements \SessionHandlerInterface {
             /** @inheritDoc */
-            public function open(string $path, string $name): bool { return true; }
+            public function open(string $_path, string $_name): bool { return true; }
 
             /** @inheritDoc */
             public function close(): bool { return true; }
 
             /** @inheritDoc */
-            public function read(string $id): string|false { return ''; }
+            public function read(string $_id): string|false { return ''; }
 
             /** @inheritDoc */
-            public function write(string $id, string $data): bool { return true; }
+            public function write(string $_id, string $_data): bool { return true; }
 
             /** @inheritDoc */
-            public function destroy(string $id): bool { return true; }
+            public function destroy(string $_id): bool { return true; }
 
             /** @inheritDoc */
-            public function gc(int $max_lifetime): int|false { return 0; }
+            public function gc(int $_max_lifetime): int|false { return 0; }
         };
 
         $admin = $this->getSessionAdminConcrete();

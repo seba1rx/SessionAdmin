@@ -127,14 +127,23 @@ abstract class Session{
      * URL authorization keys (allowedUrl, urlIsAllowedToLoad) are only written for
      * MPA apps — they are meaningless and confusing when $appIsSpa is true.
      *
+     * uniqueId is preserved across calls so it remains stable for the full session
+     * lifetime even for unauthenticated users.
+     *
      * @return void
      */
     protected function configureGuestSession(): void
     {
+        $existingUniqueId = $_SESSION['sessionadmin']['uniqueId'] ?? null;
+
         $_SESSION = [];
         $_SESSION['sessionadmin'] = [];
         $_SESSION['sessionadmin']['isUser'] = false;
         $_SESSION['sessionadmin']['msg'] = 'you are a guest';
+
+        if ($existingUniqueId !== null) {
+            $_SESSION['sessionadmin']['uniqueId'] = $existingUniqueId;
+        }
 
         if (!$this->appIsSpa) {
             $_SESSION['sessionadmin']['allowedUrl'] = $this->allowedUrls;
