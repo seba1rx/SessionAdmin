@@ -26,7 +26,6 @@ class Authentication
                 'name' => 'Sebastian',
                 'profile' => 'admin',
                 'nickname' => 'seba1rx',
-                'avatar' => 'cat-space.gif',
                 'birthDate' => '1985-05-21',
                 'country' => 'Chile',
                 'email' => $user,
@@ -47,13 +46,8 @@ class Authentication
                 $_SESSION['data'][$dataName] = $dataValue;
             }
 
-            /**
-             * in SPA mode you only need index.php
-             */
-            $_SESSION['allowedUrl'] = [];
-
             $validation->auth->ok = true;
-            $validation->auth->msg = 'Wellcome '.$_SESSION['data']['name'];
+            $validation->auth->msg = 'Welcome '.$_SESSION['data']['name'];
 
         }else{
             $validation->auth->msg = 'Complete the form fields!';

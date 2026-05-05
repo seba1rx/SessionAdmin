@@ -12,7 +12,7 @@
 
     <div class="p-4 mb-4 bg-primary text-white rounded">
         <h4 class="mb-1">SessionAdmin — SPA Demo</h4>
-        <p class="mb-0 small text-white-50">Single-Page Application · No tab indexation · URL authorization enabled</p>
+        <p class="mb-0 small text-white-50">Single-Page Application · No tab indexation · No URL authorization</p>
     </div>
 
     <div class="row g-4">
@@ -47,7 +47,7 @@
     <div id="content" class="mt-3"></div>
 
 </div>
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
 <script>
     const App = {
         getData: (formId) => {
