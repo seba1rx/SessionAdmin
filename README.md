@@ -127,7 +127,7 @@ The package ships two interfaces under `Seba1rx\SessionAdmin\Contracts` that you
 | Interface | Implemented by | Methods |
 |---|---|---|
 | `SessionInterface` | `SessionAdmin` | `activateSession()`, `createUserSession()`, `terminate()` |
-| `TabStorageInterface` | `TabManager` | `set()`, `get()`, `isTabIndexed()`, `cleanupInactiveTabs()` |
+| `TabStorageInterface` | `TabManager` | `set()`, `get()`, `isTabIndexed()`, `touchTab()`, `cleanupInactiveTabs()` |
 
 **Example — type-hint in a service class:**
 
@@ -164,6 +164,17 @@ $mockSession->expects($this->once())->method('activateSession');
 
 When `$useTabIndexation = true` (the default), a `TabManager` instance is available at `$session->tabManager` after `activateSession()`.
 
+Set `$autoIndexTab = true` to index the current tab from the `SESSIONADMIN_TABID` cookie on every request, without waiting for the JS beacon. This guarantees the tab entry exists immediately on page load, and also keeps `last_active` fresh on every request so the cleanup TTL is accurate.
+
+Set `$autoCleanupTabs` to a positive integer to automatically remove closed-tab data. On every call to `activateSession()`, tabs that have been marked inactive (via the `/sessionadmin/tab-close` beacon) for longer than the threshold are deleted. Set to `0` (default) to disable automatic cleanup.
+
+```php
+$session->useTabIndexation = true;
+$session->autoIndexTab     = true;   // index + touch tab on every request
+$session->autoCleanupTabs  = 30;     // auto-remove tabs inactive for > 30 s
+$session->activateSession();
+```
+
 **PHP:**
 
 ```php
@@ -195,7 +206,7 @@ Optional flags (set before the script loads):
 </script>
 ```
 
-The script generates a UUIDv4 per tab using `crypto.randomUUID()`, persists it in `sessionStorage`, and writes it to the `SESSIONADMIN_TABID` cookie so every PHP request can identify its tab. The server is notified only when a tab is genuinely new — not on every refresh.
+The script generates a UUIDv4 per tab using `crypto.randomUUID()`, persists it in `sessionStorage`, and writes it to the `SESSIONADMIN_TABID` cookie so every PHP request can identify its tab. The navigation type (`PerformanceNavigationTiming`) is used to distinguish a plain refresh (keep existing UUID) from a new open or a duplicated tab (generate fresh UUID), so each tab always gets its own identity. The server is notified via beacon whenever the UUID is new.
 
 ---
 

@@ -54,6 +54,19 @@ interface TabStorageInterface
     public function isTabIndexed(?string $tabId = null): bool;
 
     /**
+     * Marks a tab as active and refreshes its last_active timestamp.
+     *
+     * Useful for keeping a tab alive during long-running operations, or for
+     * correcting the last_active value when the tab was only reading (not writing).
+     *
+     * Does nothing when the tab ID has no existing entry.
+     *
+     * @param string $tabId
+     * @return void
+     */
+    public function touchTab(string $tabId): void;
+
+    /**
      * Removes inactive tab entries that have not been seen for longer than the threshold.
      *
      * Only tabs with is_active === false AND last_active older than $olderThanSeconds

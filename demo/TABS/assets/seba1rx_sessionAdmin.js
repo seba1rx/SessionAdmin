@@ -32,11 +32,15 @@ const SessionAdminClient = {
         generateUuid: () => crypto.randomUUID(),
 
         /**
-         * Resolves the tab UUID using sessionStorage only:
-         *  1. sessionStorage  — persists within the tab, cleared when tab closes
-         *  2. generate new    — fresh tab, no prior UUID found
+         * Resolves the tab UUID using sessionStorage and the navigation type:
+         *  - 'reload'      — plain refresh: preserve the existing UUID (same tab, same identity)
+         *  - anything else — fresh open, duplicate tab, or back/forward: generate a new UUID
          *
-         * Sets tab.isNew = true only when a UUID is generated for the first time.
+         * Using the PerformanceNavigationTiming type fixes the duplicate-tab case: browsers
+         * copy sessionStorage when duplicating a tab, but the navigation type is 'navigate',
+         * so a fresh UUID is generated instead of reusing the copied one.
+         *
+         * Sets tab.isNew = true whenever a new UUID is generated.
          *
          * Note: 'unique-tab-id' is the browser-side storage key (internal to this script).
          * The server-facing name is the cookie 'SESSIONADMIN_TABID', set separately in init().
@@ -46,8 +50,9 @@ const SessionAdminClient = {
          */
         assignTabUuid: () => {
             const STORAGE_KEY = 'unique-tab-id';
-            const stored = window.sessionStorage.getItem(STORAGE_KEY);
-            const isNew  = !stored;
+            const stored  = window.sessionStorage.getItem(STORAGE_KEY);
+            const navType = window.performance?.getEntriesByType?.('navigation')?.[0]?.type;
+            const isNew   = !stored || navType !== 'reload';
 
             const uid = isNew ? SessionAdminClient.tab.generateUuid() : stored;
 
@@ -113,9 +118,9 @@ const SessionAdminClient = {
 
     /**
      * Bootstraps the client:
-     *  - resolves / generates the tab UUID (sessionStorage only)
+     *  - resolves / generates the tab UUID (sessionStorage + navigation type)
      *  - syncs the SESSIONADMIN_TABID cookie
-     *  - notifies the server when the tab is genuinely new (not on every refresh)
+     *  - notifies the server when the tab UUID is new (new tab, duplicate, or stale cookie)
      *  - registers the beforeunload handler when SESSIONADMIN_AUTO_DESTROY === true
      */
     init: () => {

@@ -26,10 +26,12 @@ class TabManager implements TabStorageInterface
      * Initialises the tab storage bucket in $_SESSION if not already present.
      *
      * @param bool $autoIndex When true, the tab identified by the SESSIONADMIN_TABID
-     *                        cookie is automatically indexed if not already present.
-     *                        Useful when the application wants to guarantee the current
-     *                        tab has an entry without waiting for the JS client to call
-     *                        the new-tab endpoint.
+     *                        cookie is automatically indexed and touched on every request.
+     *                        "Touch" means last_active is refreshed and is_active is set
+     *                        to true, so the cleanup TTL reflects "last seen" rather than
+     *                        "last data write". This also re-activates a tab that was
+     *                        temporarily marked inactive by a beforeunload beacon that
+     *                        fired during a page refresh.
      */
     public function __construct(bool $autoIndex = false)
     {
@@ -41,6 +43,7 @@ class TabManager implements TabStorageInterface
             $tabId = $this->getTabId();
             if ($tabId !== null) {
                 $this->indexNewTab($tabId);
+                $this->touchTab($tabId);
             }
         }
     }
@@ -148,7 +151,11 @@ class TabManager implements TabStorageInterface
     }
 
     /**
-     * Marks a tab as inactive (used when the browser tab fires the beforeunload event).
+     * Marks a tab as inactive and records the close time.
+     *
+     * Called when the browser fires the beforeunload event. Updates last_active
+     * to the current time so that cleanupInactiveTabs() measures the threshold
+     * from the moment the tab was closed, not from its last data-write.
      *
      * @param string $tabId
      * @return void
@@ -156,7 +163,26 @@ class TabManager implements TabStorageInterface
     public function markInactiveTab(string $tabId): void
     {
         if (isset($_SESSION[$this->sessionKey][$tabId])) {
-            $_SESSION[$this->sessionKey][$tabId]['is_active'] = false;
+            $_SESSION[$this->sessionKey][$tabId]['is_active']   = false;
+            $_SESSION[$this->sessionKey][$tabId]['last_active'] = time();
+        }
+    }
+
+    /**
+     * Marks a tab as active and refreshes its last_active timestamp.
+     *
+     * Used internally by the constructor when $autoIndex is true so that
+     * last_active tracks "last seen" rather than "last data write". Can also
+     * be called directly to keep a tab alive during long-running operations.
+     *
+     * @param string $tabId
+     * @return void
+     */
+    public function touchTab(string $tabId): void
+    {
+        if (isset($_SESSION[$this->sessionKey][$tabId])) {
+            $_SESSION[$this->sessionKey][$tabId]['is_active']   = true;
+            $_SESSION[$this->sessionKey][$tabId]['last_active'] = time();
         }
     }
 

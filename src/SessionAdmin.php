@@ -43,13 +43,45 @@ abstract class SessionAdmin extends Session implements SessionInterface
     public $useTabIndexation = true;
 
     /**
-     * Sets the TabManager instance
+     * When true, TabManager auto-indexes the current tab from the SESSIONADMIN_TABID
+     * cookie on every request, without waiting for the JS client to call
+     * /sessionadmin/new-tab.
+     *
+     * Useful when the application needs the tab entry to exist immediately on page load —
+     * for example, to write tab-scoped data before the first JS beacon completes, or to
+     * guarantee that a duplicated browser tab gets an entry even if the JS beacon was
+     * skipped.
+     *
+     * @var bool
+     */
+    public bool $autoIndexTab = false;
+
+    /**
+     * Seconds after which inactive tabs are automatically removed on every call to
+     * activateSession(). A tab is considered eligible for removal when its is_active
+     * flag is false AND its last_active timestamp is older than this many seconds.
+     *
+     * Set to 0 (default) to disable automatic cleanup — tabs will persist until the
+     * session expires naturally or until cleanupInactiveTabs() is called manually.
+     *
+     * Recommended value: 30–60 seconds when SESSIONADMIN_AUTO_DESTROY is enabled,
+     * so closed-tab data is removed promptly on the next request from any open tab.
+     *
+     * @var int
+     */
+    public int $autoCleanupTabs = 0;
+
+    /**
+     * Sets the TabManager instance.
+     *
+     * Passes $autoIndexTab so TabManager can index the current tab immediately
+     * from the SESSIONADMIN_TABID cookie when the flag is enabled.
      *
      * @return void
      */
     protected function setTabManager(): void
     {
-        $this->tabManager = new TabManager();
+        $this->tabManager = new TabManager($this->autoIndexTab);
     }
 
     /**
@@ -114,6 +146,9 @@ abstract class SessionAdmin extends Session implements SessionInterface
 
         if ($this->useTabIndexation) {
             $this->setTabManager();
+            if ($this->autoCleanupTabs > 0) {
+                $this->tabManager->cleanupInactiveTabs($this->autoCleanupTabs);
+            }
         } else {
             unset($this->tabManager);
         }

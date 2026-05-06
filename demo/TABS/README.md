@@ -54,6 +54,8 @@ lookup without actually querying one.
 | `sessionLifetime` | `500` s | ~8-minute idle timeout |
 | `appIsSpa` | `true` | SPA mode — no URL authorization, no index redirect |
 | `useTabIndexation` | `true` | TabManager enabled |
+| `autoIndexTab` | `true` | Index tab from cookie on every request; no beacon needed |
+| `autoCleanupTabs` | `30` s | Remove tabs inactive for > 30 s automatically on every request |
 | `useAuthorization` | `false` | Irrelevant in SPA mode; explicit for clarity |
 | `ipOctetsToCheck` | `2` | First two IP octets compared on each request |
 | `proxyAwareIpDetection` | `true` | Reads IP from proxy headers |
@@ -70,7 +72,7 @@ lookup without actually querying one.
 | `App/Authentication.php` | Login endpoint — calls `createUserSession()`, stores user data in `$_SESSION['data']` |
 | `App/Controller.php` | `addVarToSession()` uses `tabManager->set()` for tab-scoped storage; `tabStatus()` checks `isTabIndexed()` |
 | `index.php` | Defines `SESSIONADMIN_DEBUG` / `SESSIONADMIN_DEBUG_UI` constants and includes `bin/bootstrap.php` |
-| `assets/seba1rx_sessionAdmin.js` | JS client — generates tab UUID, sets cookie, calls `/sessionadmin/new-tab` beacon |
+| `assets/seba1rx_sessionAdmin.js` | JS client — generates tab UUID per navigation, sets cookie, sends beacon on new/duplicate tabs |
 
 ---
 
@@ -78,14 +80,18 @@ lookup without actually querying one.
 
 ### Tab indexation flow
 
-1. Page loads → JS client generates a UUID per tab (stored in `sessionStorage`)
-2. UUID is synced to the `SESSIONADMIN_TABID` cookie
-3. JS sends `sendBeacon('/sessionadmin/new-tab', { tab_id: '...' })` only when the tab is genuinely new (not on refresh)
-4. Server creates the entry under `$_SESSION['tabs'][{uuid}]`
+Two mechanisms work together to guarantee every tab is indexed:
 
-Open the same URL in two browser windows — the session dump will show two distinct
-entries under `tabs`, each with its own `data` section. Refreshing does not create
-duplicate entries.
+**Server-side (immediate):** `autoIndexTab = true` in `config/session.php` tells the `TabManager` to index the current tab from the `SESSIONADMIN_TABID` cookie on every request. The tab entry exists before the JS beacon completes.
+
+**JS-side (UUID lifecycle):**
+1. Page loads → JS reads the `PerformanceNavigationTiming` type
+2. On `'reload'`: restores the existing UUID from `sessionStorage` (same tab, same identity)
+3. On any other type (`'navigate'`, `'back_forward'`): generates a fresh UUID — this covers both normal tab opens and the duplicate-tab case (browsers copy `sessionStorage` on duplicate, but navigation type is still `'navigate'`)
+4. UUID is written to `sessionStorage` and synced to the `SESSIONADMIN_TABID` cookie
+5. Beacon (`/sessionadmin/new-tab`) fires when the UUID is new
+
+Open the same URL in two browser windows — or duplicate a tab — and the session dump will show two distinct entries under `tabs`. Refreshing does not create a new entry.
 
 ### Tab-scoped storage
 
@@ -95,9 +101,9 @@ session — the second tab won't see the variable, demonstrating true per-tab is
 
 ### Tab status check
 
-Click **Check if this tab is indexed** before the JS beacon has fired (very first load,
-before the beacon response completes) — you may see "not indexed". After the beacon
-completes and you reload, it shows "indexed". This demonstrates `TabManager::isTabIndexed()`.
+Click **Check if this tab is indexed** — because `autoIndexTab = true`, the tab is already
+indexed by the time the page finishes rendering, even before the JS beacon completes.
+This demonstrates `TabManager::isTabIndexed()`.
 
 ### Debug view
 
@@ -110,9 +116,16 @@ returns JSON only.
 
 ### Tab cleanup on close
 
-`window.SESSIONADMIN_AUTO_DESTROY = true` is set in `tpl/main.php` before the JS client
-loads. This registers a `beforeunload` handler that fires `/sessionadmin/tab-close` when
-the tab closes, marking it Inactive in the debug view.
+`window.SESSIONADMIN_AUTO_DESTROY = true` is set in `tpl/main.php`. On `beforeunload`,
+the JS sends a `/sessionadmin/tab-close` beacon that marks the tab Inactive and records
+its close time. `autoCleanupTabs = 30` then removes it automatically: the next request
+from any open tab triggers `cleanupInactiveTabs(30)`, and tabs inactive for more than 30
+seconds are deleted. Watch the debug view — within 30 seconds of closing a tab, its row
+disappears on the next page interaction.
+
+Note: `beforeunload` also fires on page refresh. The touch step inside `autoIndexTab`
+re-activates the tab (`is_active = true`) on the same request that runs cleanup, so
+refreshing a tab never deletes its data.
 
 ### Session security keys
 
