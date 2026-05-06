@@ -39,9 +39,22 @@ if (!defined('__SEBA1RX_SESSIONADMIN_BOOTSTRAPPED__')) {
             exit;
         }
 
-        /** Aborts with 503 when no PHP session is active. */
+        /**
+         * Ensures a PHP session is active before handling an internal endpoint.
+         *
+         * bootstrap.php is loaded via composer autoload.files, which means it can
+         * run before the application has had a chance to call activateSession().
+         * To handle this, we try session_start() ourselves if no session is active.
+         * The application must have called session_name() with the correct name before
+         * triggering autoload; otherwise PHP uses the default name (PHPSESSID).
+         *
+         * Aborts with 503 if a session cannot be established.
+         */
         public static function requireSession(): void
         {
+            if (session_status() === PHP_SESSION_NONE) {
+                session_start();
+            }
             if (session_status() !== PHP_SESSION_ACTIVE) {
                 self::json(['error' => 'No active session'], 503);
             }

@@ -69,6 +69,7 @@ lookup without actually querying one.
 |---|---|
 | `App/MyTABSessionAdmin.php` | Minimal concrete subclass — constructor sets name, lifetime, and pre-seeded keys |
 | `config/session.php` | Bootstraps the session; the single source of configuration |
+| `index.php` | Calls `session_name()` and defines debug constants **before** `vendor/autoload.php` so that `bin/bootstrap.php` (loaded via autoload.files) can start the session early for `/sessionadmin/*` requests |
 | `App/Authentication.php` | Login endpoint — calls `createUserSession()`, stores user data in `$_SESSION['data']` |
 | `App/Controller.php` | `addVarToSession()` uses `tabManager->set()` for tab-scoped storage; `tabStatus()` checks `isTabIndexed()` |
 | `index.php` | Defines `SESSIONADMIN_DEBUG` / `SESSIONADMIN_DEBUG_UI` constants and includes `bin/bootstrap.php` |

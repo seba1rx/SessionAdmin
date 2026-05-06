@@ -34,11 +34,16 @@ const SessionAdminClient = {
         /**
          * Resolves the tab UUID using sessionStorage and the navigation type:
          *  - 'reload'      — plain refresh: preserve the existing UUID (same tab, same identity)
-         *  - anything else — fresh open, duplicate tab, or back/forward: generate a new UUID
+         *  - 'navigate'    — fresh open or duplicate tab: generate a new UUID
+         *  - 'back_forward'— browser back/forward: generate a new UUID
+         *  - 'prerender'   — prerendered page: generate a new UUID
+         *  - undefined     — API unavailable: preserve existing UUID (safe fallback)
          *
          * Using the PerformanceNavigationTiming type fixes the duplicate-tab case: browsers
          * copy sessionStorage when duplicating a tab, but the navigation type is 'navigate',
          * so a fresh UUID is generated instead of reusing the copied one.
+         * When the API is not available a new UUID is only generated when sessionStorage
+         * has no prior UUID, preserving the old behaviour on unsupported environments.
          *
          * Sets tab.isNew = true whenever a new UUID is generated.
          *
@@ -52,7 +57,12 @@ const SessionAdminClient = {
             const STORAGE_KEY = 'unique-tab-id';
             const stored  = window.sessionStorage.getItem(STORAGE_KEY);
             const navType = window.performance?.getEntriesByType?.('navigation')?.[0]?.type;
-            const isNew   = !stored || navType !== 'reload';
+            // Generate a new UUID only when navType is explicitly a fresh navigation
+            // ('navigate', 'back_forward', 'prerender'). If navType is undefined (API
+            // unavailable or empty entries), default to preserving the stored UUID —
+            // this avoids creating a new UUID on every reload in environments where
+            // PerformanceNavigationTiming is not populated.
+            const isNew   = !stored || (navType !== undefined && navType !== 'reload');
 
             const uid = isNew ? SessionAdminClient.tab.generateUuid() : stored;
 

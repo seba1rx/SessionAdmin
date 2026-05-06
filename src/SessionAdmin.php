@@ -114,10 +114,17 @@ abstract class SessionAdmin extends Session implements SessionInterface
      */
     public function activateSession(): void
     {
-        session_name($this->sessionName);
+        // Guard against calling session_name() or session_start() on an already-active
+        // session. This happens when bootstrap.php (loaded via autoload.files) starts
+        // the session early — before the application's activateSession() call —
+        // so that /sessionadmin/* endpoints can access the session data immediately.
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            session_name($this->sessionName);
+        }
         $this->setSessionTime();
-
-        session_start();
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            session_start();
+        }
 
         if (!isset($_SESSION['sessionadmin'])) {
             $_SESSION['sessionadmin'] = [];
