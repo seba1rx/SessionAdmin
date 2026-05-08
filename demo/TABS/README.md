@@ -93,6 +93,8 @@ Open the same URL in a new window — the session dump will show a distinct entr
 
 **Note on flags:** `window.SESSIONADMIN_AUTO_DESTROY` must be set in an inline `<script>` **before** the `seba1rx_sessionAdmin.js` script tag, because `init()` runs immediately on script load.
 
+**Known limitation — Chrome Memory Saver (tab discard):** Chrome can discard background tabs to free memory. When a discarded tab is brought back into focus, the browser performs a full page reload but **destroys all client-side state first**, including `sessionStorage`, `window.name`, and the JavaScript heap. There is no client-side storage that survives a tab discard. As a result, the restored tab generates a new UUID and appears as a fresh entry in the session. Preventing this would require the server to remember which UUID belonged to which tab across discards — which is only viable with a persistent connection such as WebSockets, a feature not in scope for this library.
+
 ### Tab-scoped storage
 
 Log in, then click **Add var to this tab's session**. The key/value is written only to
