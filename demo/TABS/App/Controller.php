@@ -76,6 +76,16 @@ class Controller
     }
 
     /**
+     * Destroys the PHP session and redirects the browser to an external URL.
+     */
+    public function destroyAndRedirect(): object
+    {
+        sessionAdmin()->terminate();
+        $this->response->eval = 'window.location.href = "https://www.google.com"';
+        return $this->response;
+    }
+
+    /**
      * Stores a value under the current tab's session namespace.
      * Uses TabManager::set() so the value is isolated to the calling browser tab.
      */

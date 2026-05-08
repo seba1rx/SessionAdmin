@@ -14,6 +14,7 @@ return [
         '/authenticate'      => [App\Authentication::class, 'authenticate'],
         '/demoData'          => [App\Controller::class, 'demoData'],
         '/logout'            => [App\Controller::class, 'logout'],
+        '/destroyAndRedirect' => [App\Controller::class, 'destroyAndRedirect'],
     ],
     'PUT'    => [],
     'DELETE' => [],

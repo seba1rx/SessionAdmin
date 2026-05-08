@@ -49,6 +49,10 @@
                 <button class="btn btn-outline-danger btn-sm"
                         onclick="App.request.post({url:'/logout'})">Log out</button>
             <?php endif; ?>
+            <button class="btn btn-danger btn-sm mt-2"
+                    onclick="App.request.post({url:'/destroyAndRedirect'})">
+                Destroy session &amp; go to Google
+            </button>
         </div>
 
         <!-- Right: session data -->
