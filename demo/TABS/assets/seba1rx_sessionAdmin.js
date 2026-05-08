@@ -32,20 +32,19 @@ const SessionAdminClient = {
         generateUuid: () => crypto.randomUUID(),
 
         /**
-         * Resolves the tab UUID using sessionStorage and the navigation type:
-         *  - 'reload'      — plain refresh: preserve the existing UUID (same tab, same identity)
-         *  - 'navigate'    — fresh open or duplicate tab: generate a new UUID
-         *  - 'back_forward'— browser back/forward: generate a new UUID
-         *  - 'prerender'   — prerendered page: generate a new UUID
-         *  - undefined     — API unavailable: preserve existing UUID (safe fallback)
+         * Resolves the tab UUID from sessionStorage, or generates a new one.
          *
-         * Using the PerformanceNavigationTiming type fixes the duplicate-tab case: browsers
-         * copy sessionStorage when duplicating a tab, but the navigation type is 'navigate',
-         * so a fresh UUID is generated instead of reusing the copied one.
-         * When the API is not available a new UUID is only generated when sessionStorage
-         * has no prior UUID, preserving the old behaviour on unsupported environments.
+         * A UUID is generated only when sessionStorage has no prior value (genuine
+         * new tab). If a UUID exists it is always reused — this covers soft reload
+         * (F5), hard reload (Ctrl+Shift+R), and back/forward navigation reliably.
          *
-         * Sets tab.isNew = true whenever a new UUID is generated.
+         * Note on duplicate tabs: browsers copy sessionStorage when a tab is
+         * duplicated, so both tabs will share the same UUID (and therefore the same
+         * per-tab session entry). This is a known client-side limitation — the
+         * PerformanceNavigationTiming API cannot reliably distinguish a duplicate
+         * from a hard reload because both report navType 'navigate'.
+         *
+         * Sets tab.isNew = true when a UUID is generated for the first time.
          *
          * Note: 'unique-tab-id' is the browser-side storage key (internal to this script).
          * The server-facing name is the cookie 'SESSIONADMIN_TABID', set separately in init().
@@ -56,13 +55,7 @@ const SessionAdminClient = {
         assignTabUuid: () => {
             const STORAGE_KEY = 'unique-tab-id';
             const stored  = window.sessionStorage.getItem(STORAGE_KEY);
-            const navType = window.performance?.getEntriesByType?.('navigation')?.[0]?.type;
-            // Generate a new UUID only when navType is explicitly a fresh navigation
-            // ('navigate', 'back_forward', 'prerender'). If navType is undefined (API
-            // unavailable or empty entries), default to preserving the stored UUID —
-            // this avoids creating a new UUID on every reload in environments where
-            // PerformanceNavigationTiming is not populated.
-            const isNew   = !stored || (navType !== undefined && navType !== 'reload');
+            const isNew   = !stored;
 
             const uid = isNew ? SessionAdminClient.tab.generateUuid() : stored;
 
@@ -128,9 +121,9 @@ const SessionAdminClient = {
 
     /**
      * Bootstraps the client:
-     *  - resolves / generates the tab UUID (sessionStorage + navigation type)
+     *  - resolves / generates the tab UUID (sessionStorage)
      *  - syncs the SESSIONADMIN_TABID cookie
-     *  - notifies the server when the tab UUID is new (new tab, duplicate, or stale cookie)
+     *  - notifies the server when the tab UUID is genuinely new (not on reload)
      *  - registers the beforeunload handler when SESSIONADMIN_AUTO_DESTROY === true
      */
     init: () => {

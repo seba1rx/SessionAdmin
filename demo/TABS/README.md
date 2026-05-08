@@ -86,13 +86,15 @@ Two mechanisms work together to guarantee every tab is indexed:
 **Server-side (immediate):** `autoIndexTab = true` in `config/session.php` tells the `TabManager` to index the current tab from the `SESSIONADMIN_TABID` cookie on every request. The tab entry exists before the JS beacon completes.
 
 **JS-side (UUID lifecycle):**
-1. Page loads → JS reads the `PerformanceNavigationTiming` type
-2. On `'reload'`: restores the existing UUID from `sessionStorage` (same tab, same identity)
-3. On any other type (`'navigate'`, `'back_forward'`): generates a fresh UUID — this covers both normal tab opens and the duplicate-tab case (browsers copy `sessionStorage` on duplicate, but navigation type is still `'navigate'`)
+1. Page loads → JS reads `sessionStorage['unique-tab-id']`
+2. If a UUID exists: reused unchanged — covers soft reload (F5), hard reload (Ctrl+Shift+R), and back/forward
+3. If no UUID exists: a new UUID is generated (genuine new tab, or tab opened after sessionStorage was cleared)
 4. UUID is written to `sessionStorage` and synced to the `SESSIONADMIN_TABID` cookie
-5. Beacon (`/sessionadmin/new-tab`) fires when the UUID is new
+5. Beacon (`/sessionadmin/new-tab`) fires only when a new UUID was generated
 
-Open the same URL in two browser windows — or duplicate a tab — and the session dump will show two distinct entries under `tabs`. Refreshing does not create a new entry.
+Open the same URL in a new window or a new tab — the session dump will show a distinct entry under `tabs`. Refreshing does not create a new entry.
+
+**Known limitation — duplicate tabs:** browsers copy `sessionStorage` when a tab is duplicated (middle-click, Ctrl+click). Because the `PerformanceNavigationTiming` API reports `navType = 'navigate'` for both hard reloads and duplicates, it cannot reliably distinguish the two cases; the safe default is to preserve the copied UUID. Duplicate tabs therefore share the same session entry.
 
 ### Tab-scoped storage
 
