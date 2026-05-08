@@ -35,12 +35,11 @@ final class TabManagerTest extends TestCase
 
     public function testConstructorCreatesEmptyTabsBucket(): void
     {
-        $tm  = new TabManager();
-        $key = $tm->getSessionKey();
+        new TabManager();
 
-        $this->assertArrayHasKey($key, $_SESSION);
-        $this->assertIsArray($_SESSION[$key]);
-        $this->assertEmpty($_SESSION[$key]);
+        $this->assertArrayHasKey('tabs', $_SESSION);
+        $this->assertIsArray($_SESSION['tabs']);
+        $this->assertEmpty($_SESSION['tabs']);
     }
 
     public function testConstructorDoesNotOverwriteExistingTabData(): void
@@ -51,15 +50,6 @@ final class TabManagerTest extends TestCase
         new TabManager(); // second construction must not wipe the bucket
 
         $this->assertArrayHasKey(self::TAB_A, $_SESSION['tabs']);
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // SESSION KEY
-    // ═══════════════════════════════════════════════════════════════════════
-
-    public function testGetSessionKeyReturnsExpectedValue(): void
-    {
-        $this->assertSame('tabs', (new TabManager())->getSessionKey());
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -337,57 +327,6 @@ final class TabManagerTest extends TestCase
         $tm = new TabManager();
 
         $this->assertSame(0, $tm->cleanupInactiveTabs(3600));
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // debug
-    // ═══════════════════════════════════════════════════════════════════════
-
-    public function testDebugReturnsExpectedStructureForSingleTab(): void
-    {
-        $_COOKIE['SESSIONADMIN_TABID'] = self::TAB_E;
-        $tm = new TabManager();
-        $tm->set('foo', 'bar');
-        $tm->markInactiveTab(self::TAB_E);
-
-        $debug = $tm->debug();
-
-        $this->assertIsArray($debug);
-        $this->assertArrayHasKey(self::TAB_E, $debug);
-
-        $entry = $debug[self::TAB_E];
-        $this->assertFalse($entry['is_active']);
-        $this->assertIsString($entry['last_active']); // formatted date string
-        $this->assertIsArray($entry['keys']);
-        $this->assertContains('foo', $entry['keys']);
-        $this->assertIsInt($entry['size']);
-        $this->assertGreaterThan(0, $entry['size']);
-    }
-
-    public function testDebugReturnsAllTrackedTabs(): void
-    {
-        // Set data for two different tabs
-        $_COOKIE['SESSIONADMIN_TABID'] = self::TAB_A;
-        $tmA = new TabManager();
-        $tmA->set('color', 'red');
-
-        $_COOKIE['SESSIONADMIN_TABID'] = self::TAB_B;
-        $tmB = new TabManager();
-        $tmB->set('color', 'blue');
-
-        // debug() reads the shared $_SESSION['tabs'] bucket
-        $debug = $tmA->debug();
-
-        $this->assertCount(2, $debug);
-        $this->assertArrayHasKey(self::TAB_A, $debug);
-        $this->assertArrayHasKey(self::TAB_B, $debug);
-    }
-
-    public function testDebugReturnsEmptyArrayWhenNoTabs(): void
-    {
-        $tm = new TabManager();
-
-        $this->assertSame([], $tm->debug());
     }
 
     // ═══════════════════════════════════════════════════════════════════════

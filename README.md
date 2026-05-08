@@ -27,7 +27,6 @@ composer require seba1rx/sessionadmin
 - Tabs tracked server-side: active/inactive status, last-active timestamp, stored keys
 - Automatic stale-tab cleanup via `TabManager::cleanupInactiveTabs()`
 - Optional close notification when a tab is closed (`SESSIONADMIN_AUTO_DESTROY`)
-- Built-in debug interface (HTML table or JSON)
 - Zero manual routing — endpoints registered automatically via `autoload.files`
 
 ---
@@ -197,16 +196,15 @@ $session->tabManager->cleanupInactiveTabs(3600); // remove tabs inactive for > 1
 <script src="/seba1rx_sessionAdmin.js"></script>
 ```
 
-Optional flags (set before the script loads):
+Optional flag (set before the script loads):
 
 ```html
 <script>
     window.SESSIONADMIN_AUTO_DESTROY = true;  // notify server on tab close
-    window.SESSIONADMIN_DEBUG        = true;  // log tab UUID to console
 </script>
 ```
 
-The script generates a UUIDv4 per tab using `crypto.randomUUID()`, persists it in `sessionStorage`, and writes it to the `SESSIONADMIN_TABID` cookie so every PHP request can identify its tab. The navigation type (`PerformanceNavigationTiming`) is used to distinguish a plain refresh (keep existing UUID) from a new open or a duplicated tab (generate fresh UUID), so each tab always gets its own identity. The server is notified via beacon whenever the UUID is new.
+The script generates a UUIDv4 per tab using `crypto.randomUUID()`, persists it in `sessionStorage`, and writes it to the `SESSIONADMIN_TABID` cookie so every PHP request can identify its tab. The UUID is reused on refresh and preserved across back/forward navigation; only a genuine new tab (empty `sessionStorage`) generates a fresh UUID. The server is notified via beacon whenever the UUID is new.
 
 ---
 
@@ -218,50 +216,6 @@ Registered automatically via `autoload.files` — no route configuration needed:
 |---|---|---|
 | `POST` | `/sessionadmin/new-tab` | Index a new tab (called by JS on open) |
 | `POST` | `/sessionadmin/tab-close` | Mark tab inactive (called by JS on close) |
-| `GET`  | `/sessionadmin/debug` | Tab debug info (JSON or HTML) |
-| `POST` | `/sessionadmin/debug/delete-tab` | Destroy a specific tab's data |
-
----
-
-## Debug interface
-
-Define these constants in your bootstrap before `activateSession()`:
-
-| Constant | Effect |
-|---|---|
-| `SESSIONADMIN_DEBUG` | Enables the `/sessionadmin/debug` endpoint from any host |
-| `SESSIONADMIN_DEBUG_UI` | Renders the debug endpoint as an interactive HTML table |
-
-```php
-define('SESSIONADMIN_DEBUG',    true);
-define('SESSIONADMIN_DEBUG_UI', true);
-```
-
-The endpoint is always accessible from `localhost` / `127.0.0.1` regardless of `SESSIONADMIN_DEBUG`.
-
-Visit `http://localhost/sessionadmin/debug` to see a live table of tracked tabs:
-
-| Tab UUID | Status | Last active | Keys | Size | Action |
-|---|---|---|---|---|---|
-| `7ac3d...` | Active | 2025-01-14 15:23 | cart, user | 132 | Delete |
-
-JSON response (without `SESSIONADMIN_DEBUG_UI`):
-
-```json
-{
-    "package": "seba1rx/sessionadmin",
-    "session_key": "tabs",
-    "current_tab": "7ac3d...",
-    "tabs": {
-        "7ac3d...": {
-            "is_active": true,
-            "last_active": "2025-01-14 15:23:00",
-            "keys": ["cart", "user"],
-            "size": 132
-        }
-    }
-}
-```
 
 ---
 
@@ -272,7 +226,7 @@ JSON response (without `SESSIONADMIN_DEBUG_UI`):
 | [`demo/basic/`](demo/basic/) | Minimal login/logout, no tab indexation — the simplest possible implementation |
 | [`demo/MPA/`](demo/MPA/) | Multi-page app with URL authorization and `$allowedUrls` |
 | [`demo/SPA/`](demo/SPA/) | Single-page app, SPA mode, AJAX login |
-| [`demo/TABS/`](demo/TABS/) | Full feature set: tab isolation, TabManager CRUD, debug UI |
+| [`demo/TABS/`](demo/TABS/) | Full feature set: tab isolation, TabManager CRUD |
 
 Each demo is self-contained with its own `composer.json`.
 
@@ -298,5 +252,3 @@ http://localhost:8000
 ```
 
 > The built-in server serves `index.php` by default. Change the port if `8000` is already in use (`php -S localhost:8080`).
-
-To run the debug endpoint, open a second tab and visit `http://localhost:8000/sessionadmin/debug`. If the HTML table is not visible, add `define('SESSIONADMIN_DEBUG_UI', true)` to the demo's bootstrap before starting the server.

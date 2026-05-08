@@ -9,7 +9,6 @@
  *
  * Optional window flags (set BEFORE the script loads):
  *   window.SESSIONADMIN_AUTO_DESTROY = true;  // notify server on tab close (beforeunload)
- *   window.SESSIONADMIN_DEBUG        = true;  // enable console logging
  *
  * The tab UUID is available in PHP on every request as:
  *   $_COOKIE['SESSIONADMIN_TABID']
@@ -147,13 +146,6 @@ const SessionAdminClient = {
         // Register close notification only when explicitly enabled
         if (window.SESSIONADMIN_AUTO_DESTROY === true) {
             window.addEventListener('beforeunload', SessionAdminClient.notifyTabClosed);
-        }
-
-        if (window.SESSIONADMIN_DEBUG) {
-            console.log(
-                '[SessionAdminClient] Tab UUID:', tabId,
-                SessionAdminClient.tab.isNew ? '(new)' : '(existing)'
-            );
         }
     },
 };

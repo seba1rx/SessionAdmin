@@ -215,35 +215,6 @@ class TabManager implements TabStorageInterface
     }
 
     /**
-     * Returns a summary of all tracked tabs, useful for debugging.
-     *
-     * @return array<string, array{is_active: bool, last_active: string, keys: string[], size: int}>
-     */
-    public function debug(): array
-    {
-        $result = [];
-        foreach ($_SESSION[$this->sessionKey] ?? [] as $tabId => $data) {
-            $result[$tabId] = [
-                'is_active'   => $data['is_active'] ?? false,
-                'last_active' => date('Y-m-d H:i:s', $data['last_active'] ?? 0),
-                'keys'        => isset($data['data']) ? array_keys($data['data']) : [],
-                'size'        => isset($data['data']) ? \strlen(\json_encode($data['data'])) : 0,
-            ];
-        }
-        return $result;
-    }
-
-    /**
-     * Returns the session key used as the root index for tab data.
-     *
-     * @return string
-     */
-    public function getSessionKey(): string
-    {
-        return $this->sessionKey;
-    }
-
-    /**
      * Generates a RFC 4122 compliant UUIDv4.
      *
      * @return string Lowercase UUID, e.g. '6ff19a11-97cb-4060-b68f-3b81836ec5f0'

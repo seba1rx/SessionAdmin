@@ -16,10 +16,7 @@
 
     <div class="p-4 mb-4 bg-dark text-white rounded">
         <h4 class="mb-1">SessionAdmin — Advanced Demo <span class="badge bg-info text-dark ms-2">Tabs</span></h4>
-        <p class="mb-0 small text-white-50">
-            Per-tab session isolation · URL authorization · Debug UI at
-            <a href="/sessionadmin/debug" target="_blank" class="text-info">/sessionadmin/debug</a>
-        </p>
+        <p class="mb-0 small text-white-50">Per-tab session isolation · URL authorization</p>
     </div>
 
     <div class="row g-4">

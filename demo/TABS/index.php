@@ -1,14 +1,12 @@
 <?php
 
-// Define debug constants and session name BEFORE autoload.
-// bin/bootstrap.php is registered as a composer autoload.files entry and therefore
-// runs the moment vendor/autoload.php is included. It intercepts /sessionadmin/*
-// requests and needs both the debug constants and an active session to work.
-// Setting session_name() here lets bootstrap call session_start() with the
-// correct name; activateSession() in config/session.php then skips the start
-// (already active) but still runs all security checks and cookie refresh.
-define('SESSIONADMIN_DEBUG', true);
-define('SESSIONADMIN_DEBUG_UI', true);
+// session_name() must be called BEFORE autoload.
+// bin/bootstrap.php is registered as a composer autoload.files entry and runs
+// the moment vendor/autoload.php is included. It intercepts /sessionadmin/*
+// requests and needs an active session; setting session_name() here lets
+// bootstrap call session_start() with the correct name.
+// activateSession() in config/session.php then skips the start (already active)
+// but still runs all security checks and cookie refresh.
 session_name('MyCustomTABSessionName');
 
 require __DIR__ . '/vendor/autoload.php';

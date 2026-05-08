@@ -19,7 +19,7 @@ managed automatically by `TabManager` and the JS client.
 | `POST` | `/tabStatus` | `Controller::tabStatus` | Reports whether the current tab is indexed |
 | `POST` | `/reloadSessionData` | `Controller::reloadSessionData` | Refreshes the session dump panel |
 | `POST` | `/logout` | `Controller::logout` | Calls `terminate()`, reloads |
-| `GET` | `/sessionadmin/debug` | bootstrap | HTML debug view of all tracked tabs |
+| `POST` | `/destroyAndRedirect` | `Controller::destroyAndRedirect` | Destroys session, redirects to external URL |
 
 ---
 
@@ -36,9 +36,6 @@ php -S localhost:8000 index.php
 
 # 3. Open in browser
 # http://localhost:8000
-
-# 4. Open the tab debug view in a separate browser tab
-# http://localhost:8000/sessionadmin/debug
 ```
 
 Any email + password combination is accepted — authentication simulates a database
@@ -69,10 +66,9 @@ lookup without actually querying one.
 |---|---|
 | `App/MyTABSessionAdmin.php` | Minimal concrete subclass — constructor sets name, lifetime, and pre-seeded keys |
 | `config/session.php` | Bootstraps the session; the single source of configuration |
-| `index.php` | Calls `session_name()` and defines debug constants **before** `vendor/autoload.php` so that `bin/bootstrap.php` (loaded via autoload.files) can start the session early for `/sessionadmin/*` requests |
+| `index.php` | Calls `session_name()` **before** `vendor/autoload.php` so that `bin/bootstrap.php` (loaded via autoload.files) can start the session early for `/sessionadmin/*` requests |
 | `App/Authentication.php` | Login endpoint — calls `createUserSession()`, stores user data in `$_SESSION['data']` |
 | `App/Controller.php` | `addVarToSession()` uses `tabManager->set()` for tab-scoped storage; `tabStatus()` checks `isTabIndexed()` |
-| `index.php` | Defines `SESSIONADMIN_DEBUG` / `SESSIONADMIN_DEBUG_UI` constants and includes `bin/bootstrap.php` |
 | `assets/seba1rx_sessionAdmin.js` | JS client — generates tab UUID per navigation, sets cookie, sends beacon on new/duplicate tabs |
 
 ---
@@ -108,23 +104,13 @@ Click **Check if this tab is indexed** — because `autoIndexTab = true`, the ta
 indexed by the time the page finishes rendering, even before the JS beacon completes.
 This demonstrates `TabManager::isTabIndexed()`.
 
-### Debug view
-
-Visit `http://localhost:8000/sessionadmin/debug` while the app is running. The HTML table
-shows all tracked tabs with their status (Active / Inactive), last-active timestamp, stored
-keys, and data size. The **Delete** button calls `POST /sessionadmin/debug/delete-tab`.
-
-`SESSIONADMIN_DEBUG_UI = true` is set in `index.php`. Without it the same endpoint
-returns JSON only.
-
 ### Tab cleanup on close
 
 `window.SESSIONADMIN_AUTO_DESTROY = true` is set in `tpl/main.php`. On `beforeunload`,
 the JS sends a `/sessionadmin/tab-close` beacon that marks the tab Inactive and records
 its close time. `autoCleanupTabs = 30` then removes it automatically: the next request
 from any open tab triggers `cleanupInactiveTabs(30)`, and tabs inactive for more than 30
-seconds are deleted. Watch the debug view — within 30 seconds of closing a tab, its row
-disappears on the next page interaction.
+seconds are deleted.
 
 Note: `beforeunload` also fires on page refresh. The touch step inside `autoIndexTab`
 re-activates the tab (`is_active = true`) on the same request that runs cleanup, so
