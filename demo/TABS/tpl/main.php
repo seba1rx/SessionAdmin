@@ -5,11 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>SessionAdmin — Advanced Demo (Tabs)</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
-    <!-- SessionAdmin JS client — registers tab UUID cookie and notifies the server on tab close -->
+    <!-- Flags must be set BEFORE the script: init() runs synchronously on script load -->
+    <script>window.SESSIONADMIN_AUTO_DESTROY = true;</script>
+    <!-- SessionAdmin JS client — assigns tab UUID, syncs cookie, notifies server on tab close -->
     <script src="assets/seba1rx_sessionAdmin.js"></script>
-    <script>
-        window.SESSIONADMIN_AUTO_DESTROY = true; // destroy tab data on beforeunload
-    </script>
 </head>
 <body class="bg-light">
 <div class="container py-4">

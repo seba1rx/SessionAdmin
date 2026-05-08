@@ -82,15 +82,16 @@ Two mechanisms work together to guarantee every tab is indexed:
 **Server-side (immediate):** `autoIndexTab = true` in `config/session.php` tells the `TabManager` to index the current tab from the `SESSIONADMIN_TABID` cookie on every request. The tab entry exists before the JS beacon completes.
 
 **JS-side (UUID lifecycle):**
-1. Page loads → JS reads `sessionStorage['unique-tab-id']`
-2. If a UUID exists: reused unchanged — covers soft reload (F5), hard reload (Ctrl+Shift+R), and back/forward
-3. If no UUID exists: a new UUID is generated (genuine new tab, or tab opened after sessionStorage was cleared)
-4. UUID is written to `sessionStorage` and synced to the `SESSIONADMIN_TABID` cookie
-5. Beacon (`/sessionadmin/new-tab`) fires only when a new UUID was generated
+1. Script parses in `<head>` → `init()` runs synchronously (no DOMContentLoaded wait)
+2. JS reads `sessionStorage['unique-tab-id']` and the legacy `performance.navigation.type`
+3. **TYPE_RELOAD (1) or TYPE_BACK_FORWARD (2)** with an existing UUID → UUID is reused (covers F5, Ctrl+R, Ctrl+Shift+R, back/forward)
+4. **TYPE_NAVIGATE (0)** or empty sessionStorage → a new UUID is generated (genuine new tab, duplicated tab, or discarded tab)
+5. UUID is written to `sessionStorage` and synced to the `SESSIONADMIN_TABID` cookie
+6. Beacon (`/sessionadmin/new-tab`) fires only when a new UUID was generated
 
-Open the same URL in a new window or a new tab — the session dump will show a distinct entry under `tabs`. Refreshing does not create a new entry.
+Open the same URL in a new window — the session dump will show a distinct entry under `tabs`. Duplicating a tab (Ctrl+D) also creates a new entry because the duplicated tab reports `navType = 0` (TYPE_NAVIGATE). Refreshing does not create a new entry.
 
-**Known limitation — duplicate tabs:** browsers copy `sessionStorage` when a tab is duplicated (middle-click, Ctrl+click). Because the `PerformanceNavigationTiming` API reports `navType = 'navigate'` for both hard reloads and duplicates, it cannot reliably distinguish the two cases; the safe default is to preserve the copied UUID. Duplicate tabs therefore share the same session entry.
+**Note on flags:** `window.SESSIONADMIN_AUTO_DESTROY` must be set in an inline `<script>` **before** the `seba1rx_sessionAdmin.js` script tag, because `init()` runs immediately on script load.
 
 ### Tab-scoped storage
 

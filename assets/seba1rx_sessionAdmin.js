@@ -4,10 +4,15 @@
  * Ensures every browser tab has a stable UUID and keeps the server
  * informed about tab lifecycle events (open / close).
  *
- * Include in your HTML:
+ * Include in your HTML — flags must be set BEFORE the script loads,
+ * because init() runs synchronously as soon as the script is parsed:
+ *
+ *   <script>
+ *       window.SESSIONADMIN_AUTO_DESTROY = true; // optional
+ *   </script>
  *   <script src="/assets/seba1rx_sessionAdmin.js"></script>
  *
- * Optional window flags (set BEFORE the script loads):
+ * Optional window flags:
  *   window.SESSIONADMIN_AUTO_DESTROY = true;  // notify server on tab close (beforeunload)
  *
  * The tab UUID is available in PHP on every request as:
@@ -19,7 +24,7 @@ const SessionAdminClient = {
         /** @type {string|null} Current tab UUID */
         id: null,
 
-        /** @type {boolean} True when the UUID was generated this session (vs. restored from storage) */
+        /** @type {boolean} True when a new UUID was generated (vs. restored from storage) */
         isNew: false,
 
         /**
@@ -31,32 +36,48 @@ const SessionAdminClient = {
         generateUuid: () => crypto.randomUUID(),
 
         /**
-         * Resolves the tab UUID from sessionStorage, or generates a new one.
+         * Resolves the tab UUID from sessionStorage or generates a fresh one.
          *
-         * A UUID is generated only when sessionStorage has no prior value (genuine
-         * new tab). If a UUID exists it is always reused — this covers soft reload
-         * (F5), hard reload (Ctrl+Shift+R), and back/forward navigation reliably.
+         * Uses the legacy Navigation Timing API (performance.navigation.type) to
+         * distinguish reloads from new navigations and tab duplications:
          *
-         * Note on duplicate tabs: browsers copy sessionStorage when a tab is
-         * duplicated, so both tabs will share the same UUID (and therefore the same
-         * per-tab session entry). This is a known client-side limitation — the
-         * PerformanceNavigationTiming API cannot reliably distinguish a duplicate
-         * from a hard reload because both report navType 'navigate'.
+         *   TYPE_NAVIGATE (0) — fresh navigation, OR a duplicated tab.
+         *     Browsers do not copy sessionStorage to duplicated tabs, so a stored
+         *     UUID is absent and a new one is generated. If sessionStorage somehow
+         *     holds a value under navType 0 (e.g. some browser quirk), we still
+         *     generate a new UUID to give the duplicate its own identity.
          *
-         * Sets tab.isNew = true when a UUID is generated for the first time.
+         *   TYPE_RELOAD (1) — F5, Ctrl+R, Ctrl+Shift+R, location.reload().
+         *     sessionStorage is preserved across reloads, so the existing UUID is
+         *     always reused.
          *
-         * Note: 'unique-tab-id' is the browser-side storage key (internal to this script).
-         * The server-facing name is the cookie 'SESSIONADMIN_TABID', set separately in init().
+         *   TYPE_BACK_FORWARD (2) — browser history navigation.
+         *     sessionStorage is preserved; reuse the existing UUID.
          *
-         * window.name is intentionally NOT used as a fallback: it persists across same-tab
+         * When the API is unavailable (navType === undefined), falls back to the
+         * original logic: isNew = !stored (safe, preserves UUID when present).
+         *
+         * Note: 'unique-tab-id' is the browser-side storage key (internal).
+         * The server-facing name is the cookie 'SESSIONADMIN_TABID', set in init().
+         *
+         * window.name is intentionally NOT used: it persists across same-tab
          * navigations to different origins, making it readable/writable by other sites.
          */
         assignTabUuid: () => {
             const STORAGE_KEY = 'unique-tab-id';
             const stored  = window.sessionStorage.getItem(STORAGE_KEY);
-            const isNew   = !stored;
 
-            const uid = isNew ? SessionAdminClient.tab.generateUuid() : stored;
+            // Legacy API — available synchronously before DOMContentLoaded.
+            // Default to undefined-safe "keep UUID" behaviour when API is absent.
+            const navType  = performance.navigation?.type;
+            const isReload = navType === undefined || navType === 1 || navType === 2;
+
+            // Generate a new UUID when:
+            //   - sessionStorage is empty (fresh tab or discarded tab), OR
+            //   - navType is TYPE_NAVIGATE (0): new tab or duplicated tab.
+            // Reloads and back/forward always preserve the existing UUID.
+            const isNew = !stored || !isReload;
+            const uid   = isNew ? SessionAdminClient.tab.generateUuid() : stored;
 
             window.sessionStorage.setItem(STORAGE_KEY, uid);
             SessionAdminClient.tab.id    = uid;
@@ -120,10 +141,13 @@ const SessionAdminClient = {
 
     /**
      * Bootstraps the client:
-     *  - resolves / generates the tab UUID (sessionStorage)
+     *  - resolves / generates the tab UUID (sessionStorage + navType)
      *  - syncs the SESSIONADMIN_TABID cookie
-     *  - notifies the server when the tab UUID is genuinely new (not on reload)
+     *  - notifies the server when the tab UUID is genuinely new
      *  - registers the beforeunload handler when SESSIONADMIN_AUTO_DESTROY === true
+     *
+     * Runs synchronously when the script is parsed — no DOM access required.
+     * All flags (e.g. SESSIONADMIN_AUTO_DESTROY) must be set before the script loads.
      */
     init: () => {
         SessionAdminClient.tab.assignTabUuid();
@@ -132,28 +156,24 @@ const SessionAdminClient = {
         const COOKIE = 'SESSIONADMIN_TABID';
         const prev   = SessionAdminClient.cookie.get(COOKIE);
 
-        // Keep the cookie in sync with sessionStorage
+        // Keep the cookie in sync with the current tab UUID.
         if (prev !== tabId) {
             SessionAdminClient.cookie.set(COOKIE, tabId);
         }
 
-        // Notify the server only when the tab is new or the cookie was stale.
-        // Skips the network call on plain page refreshes.
+        // Notify the server when the UUID is new or the cookie was stale.
+        // Skips the network call on plain page reloads.
         if (SessionAdminClient.tab.isNew || prev !== tabId) {
             SessionAdminClient.notifyNewTab();
         }
 
-        // Register close notification only when explicitly enabled
+        // Register close notification only when explicitly enabled.
         if (window.SESSIONADMIN_AUTO_DESTROY === true) {
             window.addEventListener('beforeunload', SessionAdminClient.notifyTabClosed);
         }
     },
 };
 
-// Guard against the script loading after DOMContentLoaded has already fired
-// (e.g. when placed at end of <body> or loaded with defer).
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', SessionAdminClient.init);
-} else {
-    SessionAdminClient.init();
-}
+// init() only touches sessionStorage, cookies, sendBeacon, and performance.navigation —
+// none require the DOM. Run synchronously so the cookie is correct for the next request.
+SessionAdminClient.init();

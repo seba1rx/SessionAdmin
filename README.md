@@ -193,18 +193,16 @@ $session->tabManager->cleanupInactiveTabs(3600); // remove tabs inactive for > 1
 **HTML — include the JS client** (published to your project root on `composer install`):
 
 ```html
+<!-- Flags MUST be set before the script: init() runs synchronously on script load -->
+<script>
+    window.SESSIONADMIN_AUTO_DESTROY = true;  // notify server on tab close (optional)
+</script>
 <script src="/seba1rx_sessionAdmin.js"></script>
 ```
 
-Optional flag (set before the script loads):
+`init()` runs synchronously as soon as the script is parsed (no DOMContentLoaded wait), so any flags must be in an inline `<script>` that precedes the script tag.
 
-```html
-<script>
-    window.SESSIONADMIN_AUTO_DESTROY = true;  // notify server on tab close
-</script>
-```
-
-The script generates a UUIDv4 per tab using `crypto.randomUUID()`, persists it in `sessionStorage`, and writes it to the `SESSIONADMIN_TABID` cookie so every PHP request can identify its tab. The UUID is reused on refresh and preserved across back/forward navigation; only a genuine new tab (empty `sessionStorage`) generates a fresh UUID. The server is notified via beacon whenever the UUID is new.
+The script generates a UUIDv4 per tab using `crypto.randomUUID()`, persists it in `sessionStorage`, and writes it to the `SESSIONADMIN_TABID` cookie so every PHP request can identify its tab. The navigation type (`performance.navigation.type`) is used to distinguish reloads (TYPE_RELOAD = 1, reuses UUID) from new navigations and duplicated tabs (TYPE_NAVIGATE = 0, generates fresh UUID). Back/forward navigation (TYPE_BACK_FORWARD = 2) also preserves the UUID.
 
 ---
 
