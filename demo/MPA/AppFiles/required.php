@@ -14,7 +14,6 @@ $conf = [
 ];
 
 $sessionAdmin = new MyMPASessionAdmin($conf);
-$sessionAdmin->useTabIndexation      = true;
 $sessionAdmin->appIsSpa              = false;
 $sessionAdmin->useAuthorization      = true;
 $sessionAdmin->ignoreInAuthorization = ['authentication.php'];

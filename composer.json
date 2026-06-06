@@ -14,23 +14,14 @@
             "Seba1rx\\SessionAdmin\\": "src/",
             "Seba1rx\\SessionAdmin\\Exceptions\\": "Exceptions/",
             "Seba1rx\\SessionAdmin\\Build\\": "build/"
-        },
-        "files": [
-            "bin/bootstrap.php"
-        ]
+        }
     },
     "scripts": {
         "test": "XDEBUG_MODE=off phpunit --colors=always",
-        "coverage": "XDEBUG_MODE=coverage phpunit --colors=always --coverage-text --coverage-html=coverage --coverage-clover=coverage/clover.xml",
-        "publish-assets": [
-            "Seba1rx\\SessionAdmin\\Build\\SessionAdminPlugin::publishAssets"
-        ]
+        "coverage": "XDEBUG_MODE=coverage phpunit --colors=always --coverage-text --coverage-html=coverage --coverage-clover=coverage/clover.xml"
     },
     "extra": {
-        "class": "Seba1rx\\SessionAdmin\\Build\\SessionAdminPlugin",
-        "publish": {
-            "assets/seba1rx_sessionAdmin.js": "seba1rx_sessionAdmin.js"
-        }
+        "class": "Seba1rx\\SessionAdmin\\Build\\SessionAdminPlugin"
     },
     "require": {
         "php": ">=8.1",

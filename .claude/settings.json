@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rm /home/legion/dev/proyectos/sessionadmin/src/TabManager.php /home/legion/dev/proyectos/sessionadmin/src/Contracts/TabStorageInterface.php /home/legion/dev/proyectos/sessionadmin/tests/TabManagerTest.php /home/legion/dev/proyectos/sessionadmin/assets/seba1rx_sessionAdmin.js)",
+      "Bash(rm -rf /home/legion/dev/proyectos/sessionadmin/demo/TABS)",
+      "Bash(XDEBUG_MODE=off ./vendor/bin/phpunit --colors=always)",
+      "Bash(php vendor/bin/phpunit --colors=always)"
+    ]
+  }
+}

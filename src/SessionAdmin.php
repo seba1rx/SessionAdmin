@@ -30,61 +30,6 @@ abstract class SessionAdmin extends Session implements SessionInterface
 {
 
     /**
-     * will hold the instance of the TabManager class
-     * @var TabManager
-     */
-    public $tabManager;
-
-    /**
-     * If true will use TabManager class to manage the set and get of session vars by indexing under tab Uuid
-     *
-     * @var boolean
-     */
-    public $useTabIndexation = true;
-
-    /**
-     * When true, TabManager auto-indexes the current tab from the SESSIONADMIN_TABID
-     * cookie on every request, without waiting for the JS client to call
-     * /sessionadmin/new-tab.
-     *
-     * Useful when the application needs the tab entry to exist immediately on page load —
-     * for example, to write tab-scoped data before the first JS beacon completes, or to
-     * guarantee that a duplicated browser tab gets an entry even if the JS beacon was
-     * skipped.
-     *
-     * @var bool
-     */
-    public bool $autoIndexTab = false;
-
-    /**
-     * Seconds after which inactive tabs are automatically removed on every call to
-     * activateSession(). A tab is considered eligible for removal when its is_active
-     * flag is false AND its last_active timestamp is older than this many seconds.
-     *
-     * Set to 0 (default) to disable automatic cleanup — tabs will persist until the
-     * session expires naturally or until cleanupInactiveTabs() is called manually.
-     *
-     * Recommended value: 30–60 seconds when SESSIONADMIN_AUTO_DESTROY is enabled,
-     * so closed-tab data is removed promptly on the next request from any open tab.
-     *
-     * @var int
-     */
-    public int $autoCleanupTabs = 0;
-
-    /**
-     * Sets the TabManager instance.
-     *
-     * Passes $autoIndexTab so TabManager can index the current tab immediately
-     * from the SESSIONADMIN_TABID cookie when the flag is enabled.
-     *
-     * @return void
-     */
-    protected function setTabManager(): void
-    {
-        $this->tabManager = new TabManager($this->autoIndexTab);
-    }
-
-    /**
      * Plugs in a custom session storage backend.
      *
      * Must be called before activateSession(). Allows swapping PHP's default
@@ -107,17 +52,12 @@ abstract class SessionAdmin extends Session implements SessionInterface
      * Starts a new session as guest or renews an existing user session.
      *
      * Configures the session cookie, starts the PHP session, enforces lifetime
-     * and hijacking checks, optionally validates URL authorization (MPA), and
-     * initialises the TabManager if tab indexation is enabled.
+     * and hijacking checks, and optionally validates URL authorization (MPA).
      *
      * @return void
      */
     public function activateSession(): void
     {
-        // Guard against calling session_name() or session_start() on an already-active
-        // session. This happens when bootstrap.php (loaded via autoload.files) starts
-        // the session early — before the application's activateSession() call —
-        // so that /sessionadmin/* endpoints can access the session data immediately.
         if (session_status() !== PHP_SESSION_ACTIVE) {
             session_name($this->sessionName);
         }
@@ -149,15 +89,6 @@ abstract class SessionAdmin extends Session implements SessionInterface
 
         if ($this->useAuthorization && !$this->appIsSpa) {
             $this->checkIfUrlIsAllowed();
-        }
-
-        if ($this->useTabIndexation) {
-            $this->setTabManager();
-            if ($this->autoCleanupTabs > 0) {
-                $this->tabManager->cleanupInactiveTabs($this->autoCleanupTabs);
-            }
-        } else {
-            unset($this->tabManager);
         }
 
         foreach ($this->keys as $key => $item) {

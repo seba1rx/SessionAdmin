@@ -56,11 +56,6 @@ abstract class SessionTestable extends SessionAdmin
         return $this->currentStateIsUser();
     }
 
-    public function callSetTabManager(): void
-    {
-        $this->setTabManager();
-    }
-
     public function callConfigureGuestSession(): void
     {
         $this->configureGuestSession();

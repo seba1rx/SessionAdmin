@@ -1,6 +1,6 @@
 # seba1rx/sessionadmin
 
-PHP session management library with security hardening and optional per-browser-tab session isolation.
+PHP session management library with security hardening and URL authorization.
 
 ```bash
 composer require seba1rx/sessionadmin
@@ -21,13 +21,6 @@ composer require seba1rx/sessionadmin
 - Define an `$allowedUrls` list; guests are redirected to `index.php` on any unlisted page
 - Expandable per user role or profile
 - Disable entirely for SPA apps (`$appIsSpa = true`, the default)
-
-**Per-tab session isolation**
-- Each browser tab gets its own scoped `$_SESSION` space via a UUID cookie
-- Tabs tracked server-side: active/inactive status, last-active timestamp, stored keys
-- Automatic stale-tab cleanup via `TabManager::cleanupInactiveTabs()`
-- Optional close notification when a tab is closed (`SESSIONADMIN_AUTO_DESTROY`)
-- Zero manual routing — endpoints registered automatically via `autoload.files`
 
 ---
 
@@ -59,7 +52,6 @@ require 'vendor/autoload.php';
 
 $session = new App\MySession();
 $session->useAuthorization  = false; // true for MPA URL enforcement
-$session->useTabIndexation  = true;  // false to disable TabManager
 $session->activateSession();         // replaces session_start()
 
 // On login:
@@ -121,34 +113,11 @@ Any PSR-compatible or custom handler works — Redis, database, encrypted file s
 
 ## Contracts (interfaces)
 
-The package ships two interfaces under `Seba1rx\SessionAdmin\Contracts` that you can type-hint against to decouple your code from the concrete classes:
+The package ships `Seba1rx\SessionAdmin\Contracts\SessionInterface` that you can type-hint against to decouple your code from the concrete class:
 
 | Interface | Implemented by | Methods |
 |---|---|---|
 | `SessionInterface` | `SessionAdmin` | `activateSession()`, `createUserSession()`, `terminate()` |
-| `TabStorageInterface` | `TabManager` | `set()`, `get()`, `isTabIndexed()`, `touchTab()`, `cleanupInactiveTabs()` |
-
-**Example — type-hint in a service class:**
-
-```php
-use Seba1rx\SessionAdmin\Contracts\SessionInterface;
-use Seba1rx\SessionAdmin\Contracts\TabStorageInterface;
-
-class CartService
-{
-    public function __construct(
-        private readonly SessionInterface    $session,
-        private readonly TabStorageInterface $tabs,
-    ) {}
-
-    public function addItem(string $sku, int $qty): void
-    {
-        $cart = $this->tabs->get('cart', []);
-        $cart[$sku] = ($cart[$sku] ?? 0) + $qty;
-        $this->tabs->set('cart', $cart);
-    }
-}
-```
 
 **Example — mock in tests:**
 
@@ -159,72 +128,13 @@ $mockSession->expects($this->once())->method('activateSession');
 
 ---
 
-## Tab isolation
-
-When `$useTabIndexation = true` (the default), a `TabManager` instance is available at `$session->tabManager` after `activateSession()`.
-
-Set `$autoIndexTab = true` to index the current tab from the `SESSIONADMIN_TABID` cookie on every request, without waiting for the JS beacon. This guarantees the tab entry exists immediately on page load, and also keeps `last_active` fresh on every request so the cleanup TTL is accurate.
-
-Set `$autoCleanupTabs` to a positive integer to automatically remove closed-tab data. On every call to `activateSession()`, tabs that have been marked inactive (via the `/sessionadmin/tab-close` beacon) for longer than the threshold are deleted. Set to `0` (default) to disable automatic cleanup.
-
-```php
-$session->useTabIndexation = true;
-$session->autoIndexTab     = true;   // index + touch tab on every request
-$session->autoCleanupTabs  = 30;     // auto-remove tabs inactive for > 30 s
-$session->activateSession();
-```
-
-**PHP:**
-
-```php
-// Store data scoped to the current browser tab
-$session->tabManager->set('cart', ['apple' => 3]);
-
-// Retrieve it
-$cart = $session->tabManager->get('cart');
-
-// Check whether the current tab has a session entry
-$session->tabManager->isTabIndexed();
-
-// Remove stale inactive tabs (e.g. call periodically to prevent session bloat)
-$session->tabManager->cleanupInactiveTabs(3600); // remove tabs inactive for > 1 hour
-```
-
-**HTML — include the JS client** (published to your project root on `composer install`):
-
-```html
-<!-- Flags MUST be set before the script: init() runs synchronously on script load -->
-<script>
-    window.SESSIONADMIN_AUTO_DESTROY = true;  // notify server on tab close (optional)
-</script>
-<script src="/seba1rx_sessionAdmin.js"></script>
-```
-
-`init()` runs synchronously as soon as the script is parsed (no DOMContentLoaded wait), so any flags must be in an inline `<script>` that precedes the script tag.
-
-The script generates a UUIDv4 per tab using `crypto.randomUUID()`, persists it in `sessionStorage`, and writes it to the `SESSIONADMIN_TABID` cookie so every PHP request can identify its tab. The navigation type (`performance.navigation.type`) is used to distinguish reloads (TYPE_RELOAD = 1, reuses UUID) from new navigations and duplicated tabs (TYPE_NAVIGATE = 0, generates fresh UUID). Back/forward navigation (TYPE_BACK_FORWARD = 2) also preserves the UUID.
-
----
-
-## Built-in endpoints
-
-Registered automatically via `autoload.files` — no route configuration needed:
-
-| Method | Path | Purpose |
-|---|---|---|
-| `POST` | `/sessionadmin/new-tab` | Index a new tab (called by JS on open) |
-| `POST` | `/sessionadmin/tab-close` | Mark tab inactive (called by JS on close) |
-
----
-
 ## Demos
 
 | Demo | Description |
 |---|---|
-| [`demo/basic/`](demo/basic/) | Minimal login/logout, no tab indexation — the simplest possible implementation |
+| [`demo/basic/`](demo/basic/) | Minimal login/logout — the simplest possible implementation |
 | [`demo/MPA/`](demo/MPA/) | Multi-page app with URL authorization and `$allowedUrls` |
 | [`demo/SPA/`](demo/SPA/) | Single-page app, SPA mode, AJAX login |
-| [`demo/TABS/`](demo/TABS/) | Full feature set: tab isolation, TabManager CRUD |
 
 Each demo is self-contained with its own `composer.json`.
 
@@ -233,7 +143,7 @@ Each demo is self-contained with its own `composer.json`.
 1. Install dependencies for the chosen demo:
 
 ```bash
-cd demo/TABS
+cd demo/basic
 composer install
 ```
 

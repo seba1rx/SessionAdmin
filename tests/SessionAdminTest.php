@@ -6,13 +6,11 @@ use PHPUnit\Framework\Attributes\UsesClass;
 use PHPUnit\Framework\TestCase;
 use Seba1rx\SessionAdmin\Session;
 use Seba1rx\SessionAdmin\SessionAdmin;
-use Seba1rx\SessionAdmin\TabManager;
 use Seba1rx\SessionAdmin\Contracts\SessionInterface;
 use Seba1rx\SessionAdmin\Exceptions\SessionAdminException;
 
 #[CoversClass(SessionAdmin::class)]
 #[CoversClass(Session::class)]
-#[UsesClass(TabManager::class)]
 class SessionAdminTest extends TestCase
 {
     // ── Fixture factory ──────────────────────────────────────────────────────
@@ -201,25 +199,6 @@ class SessionAdminTest extends TestCase
         $this->assertSame('abc123preserved', $_SESSION['sessionadmin']['uniqueId']);
     }
 
-    public function testConfigureGuestSessionPreservesExistingTabs(): void
-    {
-        session_start();
-        $existingTabs = [
-            'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee' => [
-                'data'        => ['cart' => ['item' => 1]],
-                'is_active'   => true,
-                'last_active' => 1700000000,
-            ],
-        ];
-        $_SESSION['tabs'] = $existingTabs;
-        $_SESSION['sessionadmin'] = [];
-
-        $admin = $this->getSessionAdminConcrete();
-        $this->method($admin, 'configureGuestSession')->invoke($admin);
-
-        $this->assertSame($existingTabs, $_SESSION['tabs']);
-    }
-
     public function testActivateSessionGeneratesUniqueId(): void
     {
         $admin = $this->getSessionAdminConcrete();
@@ -240,143 +219,6 @@ class SessionAdminTest extends TestCase
         // Custom keys land at the root of $_SESSION, not under 'sessionadmin'
         $this->assertSame('dark', $_SESSION['theme']);
         $this->assertSame('us', $_SESSION['region']);
-    }
-
-    public function testActivateSessionInitializesTabManager(): void
-    {
-        $admin = $this->getSessionAdminConcrete();
-        $admin->useTabIndexation = true;
-        $admin->activateSession();
-
-        $this->assertInstanceOf(TabManager::class, $admin->tabManager);
-    }
-
-    public function testActivateSessionSkipsTabManagerWhenDisabled(): void
-    {
-        $admin = $this->getSessionAdminConcrete();
-        $admin->useTabIndexation = false;
-        $admin->activateSession();
-
-        $this->assertFalse(isset($admin->tabManager));
-    }
-
-    public function testAutoIndexTabCreatesEntryWhenCookieIsPresent(): void
-    {
-        $tabId = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
-        $_COOKIE['SESSIONADMIN_TABID'] = $tabId;
-
-        $admin = $this->getSessionAdminConcrete();
-        $admin->useTabIndexation = true;
-        $admin->autoIndexTab     = true;
-        $admin->activateSession();
-
-        $this->assertArrayHasKey($tabId, $_SESSION['tabs']);
-
-        unset($_COOKIE['SESSIONADMIN_TABID']);
-    }
-
-    public function testAutoIndexTabDoesNotCreateEntryWhenDisabled(): void
-    {
-        $tabId = 'bbbbbbbb-cccc-4ddd-8eee-ffffffffffff';
-        $_COOKIE['SESSIONADMIN_TABID'] = $tabId;
-
-        $admin = $this->getSessionAdminConcrete();
-        $admin->useTabIndexation = true;
-        $admin->autoIndexTab     = false;
-        $admin->activateSession();
-
-        $this->assertArrayNotHasKey($tabId, $_SESSION['tabs'] ?? []);
-
-        unset($_COOKIE['SESSIONADMIN_TABID']);
-    }
-
-    public function testAutoIndexTabTouchesLastActiveOnExistingTab(): void
-    {
-        $tabId = 'cccccccc-dddd-4eee-8fff-aaaaaaaaaaaa';
-        $_COOKIE['SESSIONADMIN_TABID'] = $tabId;
-
-        session_start();
-        $_SESSION['tabs'] = [
-            $tabId => [
-                'data'        => ['x' => 1],
-                'is_active'   => false,
-                'last_active' => 1000, // deliberately stale
-            ],
-        ];
-        session_write_close();
-
-        $admin = $this->getSessionAdminConcrete();
-        $admin->useTabIndexation = true;
-        $admin->autoIndexTab     = true;
-        $admin->activateSession();
-
-        $this->assertTrue($_SESSION['tabs'][$tabId]['is_active']);
-        $this->assertGreaterThan(1000, $_SESSION['tabs'][$tabId]['last_active']);
-
-        unset($_COOKIE['SESSIONADMIN_TABID']);
-    }
-
-    public function testAutoCleanupTabsRemovesStaleInactiveTab(): void
-    {
-        $staleTabId = 'dddddddd-eeee-4fff-8aaa-bbbbbbbbbbbb';
-        session_start();
-        $_SESSION['tabs'] = [
-            $staleTabId => [
-                'data'        => ['foo' => 'bar'],
-                'is_active'   => false,
-                'last_active' => time() - 60, // inactive for 60 s
-            ],
-        ];
-        session_write_close();
-
-        $admin = $this->getSessionAdminConcrete();
-        $admin->useTabIndexation = true;
-        $admin->autoCleanupTabs  = 30;
-        $admin->activateSession();
-
-        $this->assertArrayNotHasKey($staleTabId, $_SESSION['tabs'] ?? []);
-    }
-
-    public function testAutoCleanupTabsPreservesRecentlyInactiveTab(): void
-    {
-        $recentTabId = 'eeeeeeee-ffff-4000-8111-cccccccccccc';
-        session_start();
-        $_SESSION['tabs'] = [
-            $recentTabId => [
-                'data'        => [],
-                'is_active'   => false,
-                'last_active' => time() - 10, // inactive for only 10 s
-            ],
-        ];
-        session_write_close();
-
-        $admin = $this->getSessionAdminConcrete();
-        $admin->useTabIndexation = true;
-        $admin->autoCleanupTabs  = 30;
-        $admin->activateSession();
-
-        $this->assertArrayHasKey($recentTabId, $_SESSION['tabs'] ?? []);
-    }
-
-    public function testAutoCleanupTabsDisabledByDefault(): void
-    {
-        $staleTabId = 'ffffffff-0000-4111-8222-dddddddddddd';
-        session_start();
-        $_SESSION['tabs'] = [
-            $staleTabId => [
-                'data'        => [],
-                'is_active'   => false,
-                'last_active' => time() - 3600,
-            ],
-        ];
-        session_write_close();
-
-        $admin = $this->getSessionAdminConcrete();
-        $admin->useTabIndexation = true;
-        // autoCleanupTabs defaults to 0 — no cleanup
-        $admin->activateSession();
-
-        $this->assertArrayHasKey($staleTabId, $_SESSION['tabs'] ?? []);
     }
 
     public function testCreateUserSessionCookieUsesRegeneratedSessionId(): void
@@ -906,7 +748,6 @@ class SessionAdminTest extends TestCase
 
         $this->assertTrue($admin->appIsSpa);
         $this->assertFalse($admin->useAuthorization);
-        $this->assertTrue($admin->useTabIndexation);
         $this->assertTrue($admin->proxyAwareIpDetection);
         $this->assertSame(2, $admin->ipOctetsToCheck);
         $this->assertSame([], $admin->ignoreInAuthorization);

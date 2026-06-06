@@ -19,10 +19,6 @@ class MySession extends SessionAdmin
         // Pre-seed a custom key that will be available in $_SESSION from the start
         $this->keys = ['app_theme' => 'light'];
 
-        // Tab indexation is disabled in this demo to keep things simple.
-        // Set useTabIndexation = true (and include the JS client) to enable per-tab storage.
-        $this->useTabIndexation = false;
-
         // appIsSpa = true (default): no MPA URL authorization, no redirect on terminate().
         // Set appIsSpa = false for traditional multi-page apps.
     }
