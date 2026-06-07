@@ -133,8 +133,8 @@ $mockSession->expects($this->once())->method('activateSession');
 | Demo | Description |
 |---|---|
 | [`demo/basic/`](demo/basic/) | Minimal login/logout — the simplest possible implementation |
-| [`demo/MPA/`](demo/MPA/) | Multi-page app with URL authorization and `$allowedUrls` |
-| [`demo/SPA/`](demo/SPA/) | Single-page app, SPA mode, AJAX login |
+| [`demo/mpa/`](demo/mpa/) | Multi-page app with URL authorization and `$allowedUrls` |
+| [`demo/spa/`](demo/spa/) | Single-page app, SPA mode, AJAX login |
 
 Each demo is self-contained with its own `composer.json`.
 
