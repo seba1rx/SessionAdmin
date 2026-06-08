@@ -16,7 +16,7 @@ When reviewing this demo, pay close attention to the following files:
 This is where you define your session's "personality" by extending `SessionAdmin`.
 - **Configuration**: The constructor sets the `sessionName` (the cookie name) and `sessionLifetime`. 
 - **Pre-seeded Keys**: Notice the `$keys` array. These values are automatically injected into `$_SESSION` when the session starts if they don't already exist.
-- **Simplicity**: `useTabIndexation` is set to `false`, meaning data stays at the root of `$_SESSION` rather than being scoped to specific browser tabs.
+- **Simplicity**: `$appIsSpa` is `true` (the default), which disables MPA URL authorization and redirect-on-terminate. No tab isolation is configured.
 
 ### 2. `index.php`
 The application entry point.
