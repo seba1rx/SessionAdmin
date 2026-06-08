@@ -24,7 +24,6 @@ return array(
     'Seld\\PharUtils\\' => array($vendorDir . '/seld/phar-utils/src'),
     'Seld\\JsonLint\\' => array($vendorDir . '/seld/jsonlint/src/Seld/JsonLint'),
     'Seba1rx\\SessionAdmin\\Tests\\' => array($baseDir . '/tests'),
-    'Seba1rx\\SessionAdmin\\Exceptions\\' => array($baseDir . '/Exceptions'),
     'Seba1rx\\SessionAdmin\\Build\\' => array($baseDir . '/build'),
     'Seba1rx\\SessionAdmin\\' => array($baseDir . '/src'),
     'React\\Promise\\' => array($vendorDir . '/react/promise/src'),

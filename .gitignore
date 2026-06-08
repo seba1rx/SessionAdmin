@@ -3,6 +3,9 @@
 .idea/
 CLAUDE.md
 
+# Claude Code memory and session files
+.claude/
+
 # Composer dependencies
 vendor/
 

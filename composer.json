@@ -1,7 +1,7 @@
 {
     "name": "seba1rx/sessionadmin",
-    "description": "php session admin featuring url control and security against hijicking",
-    "type": "composer-plugin",
+    "description": "PHP session management with security hardening, hijacking detection, and URL authorization for MPA and SPA applications",
+    "type": "library",
     "license": "MIT",
     "authors": [
         {
@@ -12,7 +12,6 @@
     "autoload": {
         "psr-4": {
             "Seba1rx\\SessionAdmin\\": "src/",
-            "Seba1rx\\SessionAdmin\\Exceptions\\": "Exceptions/",
             "Seba1rx\\SessionAdmin\\Build\\": "build/"
         }
     },
@@ -20,16 +19,11 @@
         "test": "XDEBUG_MODE=off phpunit --colors=always",
         "coverage": "XDEBUG_MODE=coverage phpunit --colors=always --coverage-text --coverage-html=coverage --coverage-clover=coverage/clover.xml"
     },
-    "extra": {
-        "class": "Seba1rx\\SessionAdmin\\Build\\SessionAdminPlugin"
-    },
     "require": {
-        "php": ">=8.1",
-        "composer-plugin-api": "^2.0"
+        "php": ">=8.1"
     },
     "require-dev": {
-        "phpunit/phpunit": "*",
-        "composer/composer": "^2.0"
+        "phpunit/phpunit": "^13.0"
     },
     "autoload-dev": {
         "psr-4": {
