@@ -7,6 +7,7 @@ use PHPUnit\Framework\TestCase;
 use Seba1rx\SessionAdmin\Session;
 use Seba1rx\SessionAdmin\SessionAdmin;
 use Seba1rx\SessionAdmin\Contracts\SessionInterface;
+use Seba1rx\SessionAdmin\Contracts\TabHandlerInterface;
 use Seba1rx\SessionAdmin\Exceptions\SessionAdminException;
 
 #[CoversClass(SessionAdmin::class)]
@@ -854,5 +855,83 @@ class SessionAdminTest extends TestCase
 
         // Restore native handler.
         session_set_save_handler(new \SessionHandler());
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // TAB HANDLER
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /** $tabHandler must be null by default — no tab handling until explicitly configured. */
+    public function testTabHandlerDefaultIsNull(): void
+    {
+        $admin = $this->getSessionAdminConcrete();
+
+        $this->assertNull($admin->tabHandler);
+    }
+
+    /** $autoCleanupTabs must default to 0 (cleanup disabled). */
+    public function testAutoCleanupTabsDefaultIsZero(): void
+    {
+        $admin = $this->getSessionAdminConcrete();
+
+        $this->assertSame(0, $admin->autoCleanupTabs);
+    }
+
+    /** setTabHandler() must assign the handler to the $tabHandler property. */
+    public function testSetTabHandlerAssignsHandler(): void
+    {
+        $admin   = $this->getSessionAdminConcrete();
+        $handler = $this->createStub(TabHandlerInterface::class);
+
+        $admin->setTabHandler($handler);
+
+        $this->assertSame($handler, $admin->tabHandler);
+    }
+
+    /**
+     * When a handler is set and $autoCleanupTabs > 0, activateSession() must
+     * call cleanupInactiveTabs() with the configured threshold.
+     */
+    public function testActivateSessionCallsCleanupWhenHandlerSetAndAutoCleanupEnabled(): void
+    {
+        $admin   = $this->getSessionAdminConcrete();
+        $handler = $this->createMock(TabHandlerInterface::class);
+        $handler->expects($this->once())
+                ->method('cleanupInactiveTabs')
+                ->with(30);
+
+        $admin->setTabHandler($handler);
+        $admin->autoCleanupTabs = 30;
+        $admin->activateSession();
+    }
+
+    /**
+     * When $autoCleanupTabs is 0 (the default), cleanupInactiveTabs() must
+     * never be called even if a handler is set.
+     */
+    public function testActivateSessionSkipsCleanupWhenAutoCleanupIsZero(): void
+    {
+        $admin   = $this->getSessionAdminConcrete();
+        $handler = $this->createMock(TabHandlerInterface::class);
+        $handler->expects($this->never())->method('cleanupInactiveTabs');
+
+        $admin->setTabHandler($handler);
+        // autoCleanupTabs stays at its default (0)
+        $admin->activateSession();
+    }
+
+    /**
+     * When no handler is set, activateSession() must complete without error
+     * even if $autoCleanupTabs is non-zero.
+     */
+    public function testActivateSessionSkipsCleanupWhenNoHandlerSet(): void
+    {
+        $admin = $this->getSessionAdminConcrete();
+        $admin->autoCleanupTabs = 30;
+
+        // Must not throw
+        $admin->activateSession();
+
+        $this->assertNull($admin->tabHandler);
     }
 }

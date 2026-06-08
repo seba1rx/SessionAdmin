@@ -23,9 +23,9 @@ composer test                    # run full test suite (PHPUnit)
 ### Class hierarchy
 
 ```
-Contracts/SessionInterface
-        │
-        ▼
+Contracts/SessionInterface    Contracts/TabHandlerInterface
+        │                               ▲
+        ▼                               │ (implemented by seba1rx/tabmanager)
 Session  (abstract)
   └── SessionAdmin  (abstract, implements SessionInterface)
         └── YourImplementation  (concrete, user-defined)
@@ -35,6 +35,16 @@ Session  (abstract)
 - `activateSession(): void`
 - `createUserSession(mixed $id_user): void`
 - `terminate(): void`
+
+**`src/Contracts/TabHandlerInterface.php`** — Contract for a per-browser-tab session handler. `SessionAdmin` accepts any conforming implementation via `setTabHandler()` and never depends on the concrete class:
+- `indexNewTab(string $tabId): void`
+- `touchTab(string $tabId): void`
+- `set(string $key, mixed $value): void`
+- `get(string $key, mixed $default = null): mixed`
+- `isTabIndexed(?string $tabId = null): bool`
+- `markInactiveTab(string $tabId): void`
+- `destroyTabSession(string $tabId): void`
+- `cleanupInactiveTabs(int $olderThanSeconds): int`
 
 **`src/Session.php`** — Abstract base. All security and session mechanics live here as `protected` methods:
 - Session cookie configuration (`setSessionTime`, `setSessionTimeStamps`)
@@ -46,10 +56,13 @@ Session  (abstract)
 - `redirectToIndex()` — override in test subclasses to intercept redirects without calling `exit()`
 
 **`src/SessionAdmin.php`** — Abstract public API layer. Implements `SessionInterface`. Extend this in your app:
-- `activateSession()` — call instead of `session_start()`; runs the full boot sequence
+- `activateSession()` — call instead of `session_start()`; runs the full boot sequence; calls `cleanupInactiveTabs()` when `$tabHandler` and `$autoCleanupTabs > 0`
 - `createUserSession($id)` — marks session as authenticated, regenerates session ID
 - `terminate()` — destroys session, re-initialises as guest, redirects to `index.php` (MPA only)
 - `setSessionHandler(\SessionHandlerInterface $handler)` — plugs in a custom session storage backend (Redis, DB, etc.); must be called before `activateSession()`
+- `setTabHandler(TabHandlerInterface $handler)` — injects a tab handler; must be called before `activateSession()`
+- `$tabHandler` (`?TabHandlerInterface`) — holds the injected handler; access tab-scoped data via `$session->tabHandler->set()/get()`
+- `$autoCleanupTabs` (`int`, default `0`) — when > 0 and a handler is set, prunes inactive tabs older than this many seconds on every `activateSession()` call
 
 ### Session data layout
 
@@ -83,6 +96,7 @@ Set these on your implementation instance before calling `activateSession()`:
 | `$proxyAwareIpDetection` | `true` | Read IP from proxy headers |
 | `$terminateRedirects` | `true` | Redirect to index on `terminate()` |
 | `$ignoreInAuthorization` | `[]` | Files excluded from URL auth check |
+| `$autoCleanupTabs` | `0` | Seconds threshold for auto-pruning inactive tabs (requires `setTabHandler()`; `0` disables) |
 
 ### Composer plugin (`build/SessionAdminPlugin.php`)
 
@@ -121,6 +135,24 @@ $session->terminate();
 // Check auth:
 if (!empty($_SESSION['sessionadmin']['isUser'])) { /* ... */ }
 ```
+
+### With tab isolation (optional — requires seba1rx/tabmanager)
+
+```php
+use Seba1rx\TabManager\Bridge\SessionAdminBridge;
+
+$session = new App\MySession();
+$session->setTabHandler(new SessionAdminBridge()); // inject before activateSession()
+$session->autoCleanupTabs = 30;                   // prune inactive tabs older than 30 s
+$session->activateSession();
+
+// Tab-scoped storage (after the JS client has registered the tab):
+$session->tabHandler->set('cart', ['apple' => 3]);
+$cart  = $session->tabHandler->get('cart');
+$ready = $session->tabHandler->isTabIndexed(); // false until JS registers the tab
+```
+
+`SessionAdminBridge` extends `TabManager` but defers `session_start()` to `activateSession()`, ensuring the session name and cookie parameters are applied before the session opens. Both packages write to distinct keys in `$_SESSION` (`sessionadmin` vs `tabmanager`) and do not interfere.
 
 ## Testing
 

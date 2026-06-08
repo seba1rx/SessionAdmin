@@ -74,6 +74,7 @@ if (!empty($_SESSION['sessionadmin']['isUser'])) {
 | `createUserSession(mixed $id)` | Marks session as authenticated, regenerates session ID |
 | `terminate()` | Destroys session, reinitialises as guest, redirects to `index.php` (MPA) |
 | `setSessionHandler(\SessionHandlerInterface $handler)` | Plug in a custom storage backend; call before `activateSession()` |
+| `setTabHandler(TabHandlerInterface $handler)` | Inject a tab handler (e.g. `seba1rx/tabmanager`); call before `activateSession()` |
 
 The full class is documented via docblocks — your IDE will surface every property and its purpose.
 
@@ -111,19 +112,58 @@ Any PSR-compatible or custom handler works — Redis, database, encrypted file s
 
 ---
 
+## Tab isolation (optional)
+
+Per-browser-tab session isolation is provided by the companion package [`seba1rx/tabmanager`](https://github.com/seba1rx/tabmanager), which implements `TabHandlerInterface`.
+
+```bash
+composer require seba1rx/tabmanager
+```
+
+Inject it before calling `activateSession()` using `SessionAdminBridge` — the integration class shipped with tabmanager:
+
+```php
+use Seba1rx\TabManager\Bridge\SessionAdminBridge;
+
+$session = new App\MySession();
+$session->setTabHandler(new SessionAdminBridge());
+$session->autoCleanupTabs = 30; // optional: remove tabs inactive for > 30 s
+$session->activateSession();
+
+// After the JS client has registered the tab:
+$session->tabHandler->set('cart', ['apple' => 3]);
+$cart  = $session->tabHandler->get('cart');
+$ready = $session->tabHandler->isTabIndexed(); // false until JS registers the tab
+```
+
+`SessionAdminBridge` extends `TabManager` but does not call `session_start()` in its constructor — `activateSession()` owns the session lifecycle and configures the session name and cookie parameters before the session starts. Both packages write to distinct keys in `$_SESSION` (`sessionadmin` vs `tabmanager`) and do not interfere with each other.
+
+---
+
 ## Contracts (interfaces)
 
-The package ships `Seba1rx\SessionAdmin\Contracts\SessionInterface` that you can type-hint against to decouple your code from the concrete class:
+The package ships two interfaces under `Seba1rx\SessionAdmin\Contracts`:
 
-| Interface | Implemented by | Methods |
+| Interface | Role | Key methods |
 |---|---|---|
-| `SessionInterface` | `SessionAdmin` | `activateSession()`, `createUserSession()`, `terminate()` |
+| `SessionInterface` | Implemented by `SessionAdmin` | `activateSession()`, `createUserSession()`, `terminate()` |
+| `TabHandlerInterface` | Implemented by `seba1rx/tabmanager` | `set()`, `get()`, `isTabIndexed()`, `cleanupInactiveTabs()`, … |
 
-**Example — mock in tests:**
+`TabHandlerInterface` defines the full tab lifecycle contract. Any class implementing it can be injected via `setTabHandler()` — SessionAdmin never depends on the concrete `TabManager` class.
+
+**Example — mock session in tests:**
 
 ```php
 $mockSession = $this->createMock(SessionInterface::class);
 $mockSession->expects($this->once())->method('activateSession');
+```
+
+**Example — mock tab handler in tests:**
+
+```php
+$mockTabs = $this->createMock(TabHandlerInterface::class);
+$mockTabs->method('get')->with('cart')->willReturn(['apple' => 3]);
+$session->setTabHandler($mockTabs);
 ```
 
 ---

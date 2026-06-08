@@ -3,6 +3,7 @@
 namespace Seba1rx\SessionAdmin;
 
 use Seba1rx\SessionAdmin\Contracts\SessionInterface;
+use Seba1rx\SessionAdmin\Contracts\TabHandlerInterface;
 
 /**
  * Abstract public API layer for session management.
@@ -30,6 +31,44 @@ abstract class SessionAdmin extends Session implements SessionInterface
 {
 
     /**
+     * Tab handler injected via setTabHandler().
+     *
+     * Null until setTabHandler() is called. Access tab-scoped data through
+     * this property after activateSession() has been called:
+     *   $session->tabHandler->set('key', $value);
+     *   $value = $session->tabHandler->get('key');
+     *
+     * @var TabHandlerInterface|null
+     */
+    public ?TabHandlerInterface $tabHandler = null;
+
+    /**
+     * Seconds after which inactive tabs are automatically removed on every
+     * call to activateSession(). Requires $tabHandler to be set.
+     *
+     * A tab is eligible for removal when its is_active flag is false AND its
+     * last_active timestamp is older than this many seconds. Set to 0
+     * (default) to disable automatic cleanup.
+     *
+     * @var int
+     */
+    public int $autoCleanupTabs = 0;
+
+    /**
+     * Injects a tab handler. Must be called before activateSession().
+     *
+     * When $autoCleanupTabs > 0, the handler's cleanupInactiveTabs() is
+     * called automatically on every activateSession() invocation.
+     *
+     * @param TabHandlerInterface $handler
+     * @return void
+     */
+    public function setTabHandler(TabHandlerInterface $handler): void
+    {
+        $this->tabHandler = $handler;
+    }
+
+    /**
      * Plugs in a custom session storage backend.
      *
      * Must be called before activateSession(). Allows swapping PHP's default
@@ -53,6 +92,8 @@ abstract class SessionAdmin extends Session implements SessionInterface
      *
      * Configures the session cookie, starts the PHP session, enforces lifetime
      * and hijacking checks, and optionally validates URL authorization (MPA).
+     * When a tab handler is set and $autoCleanupTabs > 0, stale inactive tabs
+     * are pruned automatically on every call.
      *
      * @return void
      */
@@ -89,6 +130,10 @@ abstract class SessionAdmin extends Session implements SessionInterface
 
         if ($this->useAuthorization && !$this->appIsSpa) {
             $this->checkIfUrlIsAllowed();
+        }
+
+        if ($this->tabHandler !== null && $this->autoCleanupTabs > 0) {
+            $this->tabHandler->cleanupInactiveTabs($this->autoCleanupTabs);
         }
 
         foreach ($this->keys as $key => $item) {
