@@ -1,0 +1,380 @@
+# seba1rx/sessionadmin
+
+> PHP 8.1+ library that wraps native PHP sessions with security hardening and URL authorization. Handles session lifecycle (start, authenticate, terminate), hijacking detection, session ID regeneration, and optional URL-based access control for multi-page applications.
+
+## Mental model
+
+```
+Every PHP entry point (page or AJAX endpoint)
+  └─ $session->activateSession()
+        ├─ sets session name + cookie params
+        ├─ calls session_start()
+        ├─ checks lifetime → destroys if expired
+        ├─ checks IP prefix + User-Agent → destroys if mismatch
+        ├─ randomly regenerates session ID (~3% of requests)
+        ├─ checks URL authorization (MPA only)
+        └─ prunes inactive tabs (if tab handler set + autoCleanupTabs > 0)
+
+On login:
+  └─ $session->createUserSession($userId)
+        ├─ marks $_SESSION['sessionadmin']['isUser'] = true
+        └─ regenerates session ID (session fixation prevention)
+
+On logout:
+  └─ $session->terminate()
+        ├─ wipes $_SESSION
+        ├─ destroys and restarts session as guest
+        └─ redirects to index.php (MPA only, when $terminateRedirects = true)
+```
+
+## Session data structure
+
+```php
+$_SESSION['sessionadmin'] = [
+    'appType'             => 'SPA',         // 'SPA' | 'MPA'
+    'isUser'              => false,         // true after createUserSession()
+    'id_user'             => null,          // set by createUserSession($id)
+    'msg'                 => 'you are a guest',
+    'uniqueId'            => 'a1b2c3d4e5f6', // 12-char hex, stable for session lifetime
+    'ipPrefix'            => '192.168',     // first N octets (hijacking detection)
+    'userAgent'           => 'Mozilla/…',
+    'time_atRequest'      => 1749340800,    // unix timestamp of current request
+    'time_sinceLastRequest' => 42,          // seconds since previous request
+
+    // MPA only (when $appIsSpa = false):
+    'allowedUrl'          => ['index.php', 'page2.php'],
+    'urlIsAllowedToLoad'  => true,
+];
+```
+
+All keys are under `$_SESSION['sessionadmin']`. The package never writes to other top-level `$_SESSION` keys (except `$keys` pre-seeding — see configuration).
+
+## Installation
+
+```bash
+composer require seba1rx/sessionadmin
+```
+
+## Minimal implementation
+
+`SessionAdmin` is abstract with no abstract methods. Extend it and set properties in the constructor:
+
+```php
+// App/MySession.php
+namespace App;
+
+use Seba1rx\SessionAdmin\SessionAdmin;
+
+class MySession extends SessionAdmin
+{
+    public function __construct()
+    {
+        $this->sessionName     = 'my_app';   // cookie name (default: 'SESSION')
+        $this->sessionLifetime = 3600;        // idle timeout in seconds (default: 2400)
+        $this->keys            = ['theme' => 'light']; // pre-seeded $_SESSION keys (optional)
+    }
+}
+```
+
+## Entry point — every PHP file that handles a request
+
+```php
+require 'vendor/autoload.php';
+
+$session = new App\MySession();
+$session->activateSession(); // replaces session_start()
+
+// Check auth:
+if (!empty($_SESSION['sessionadmin']['isUser'])) {
+    $userId = $_SESSION['sessionadmin']['id_user'];
+}
+
+// On login:
+$session->createUserSession($userId);
+
+// On logout:
+$session->terminate();
+```
+
+## Public API
+
+| Method | Signature | Description |
+|--------|-----------|-------------|
+| `activateSession` | `(): void` | Starts or resumes the session. Runs all security checks, URL auth (MPA), and tab cleanup. Call instead of `session_start()`. |
+| `createUserSession` | `(mixed $id): void` | Marks session as authenticated. Stores `$id` as `id_user`. Regenerates session ID. |
+| `terminate` | `(): void` | Wipes session data, destroys session, restarts as guest. Redirects to `index.php` in MPA mode. |
+| `setSessionHandler` | `(\SessionHandlerInterface $handler): void` | Plugs in a custom storage backend (Redis, DB, etc.). Call before `activateSession()`. |
+| `setTabHandler` | `(TabHandlerInterface $handler): void` | Injects a per-tab session handler. Call before `activateSession()`. |
+
+## Configuration properties
+
+Set on the instance before calling `activateSession()`. Typically set in the constructor of your subclass.
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `$sessionName` | `string` | `'SESSION'` | PHP session name and cookie name |
+| `$sessionLifetime` | `int` | `2400` | Idle timeout in seconds |
+| `$appIsSpa` | `bool` | `true` | Disables URL authorization and index redirect. Set to `false` for MPA. |
+| `$useAuthorization` | `bool` | `false` | Enforces `$allowedUrls` check. Requires `$appIsSpa = false`. |
+| `$allowedUrls` | `array` | `[]` | Filenames allowed to load for guests (MPA). Append to after login for private pages. |
+| `$ignoreInAuthorization` | `array` | `[]` | Filenames that bypass URL authorization (auth handlers, logout endpoints). |
+| `$ipOctetsToCheck` | `int` | `2` | Number of IP octets compared for hijacking detection (2–4). |
+| `$proxyAwareIpDetection` | `bool` | `true` | Read IP from proxy headers (`X-Forwarded-For`, etc.). Set to `false` for `REMOTE_ADDR` only. |
+| `$terminateRedirects` | `bool` | `true` | Whether `terminate()` redirects to `index.php` (MPA only). |
+| `$keys` | `array` | `[]` | Key-value pairs pre-seeded into `$_SESSION` on first `activateSession()`. |
+| `$autoCleanupTabs` | `int` | `0` | Seconds threshold for auto-pruning inactive tabs. Requires `setTabHandler()`. `0` disables. |
+
+## SPA mode (default)
+
+No configuration needed — `$appIsSpa = true` is the default. URL authorization is off. `terminate()` destroys the session and starts a fresh guest session without redirecting.
+
+```php
+class MySession extends SessionAdmin
+{
+    public function __construct()
+    {
+        $this->sessionName     = 'my_spa';
+        $this->sessionLifetime = 3600;
+    }
+}
+
+$session = new MySession();
+$session->activateSession();
+
+// Auth check for AJAX endpoint:
+if (empty($_SESSION['sessionadmin']['isUser'])) {
+    http_response_code(401);
+    echo json_encode(['error' => 'unauthenticated']);
+    exit;
+}
+```
+
+## MPA mode — URL authorization
+
+Set `$appIsSpa = false` and `$useAuthorization = true`. Define which filenames guests may access in `$allowedUrls`. After login, append private pages to `$_SESSION['sessionadmin']['allowedUrl']`. Add auth-related files (login processor, logout) to `$ignoreInAuthorization` so they are never blocked.
+
+```php
+// AppFiles/required.php — include at the top of every page
+require __DIR__ . '/../vendor/autoload.php';
+
+$session = new App\MySession();
+$session->appIsSpa              = false;
+$session->useAuthorization      = true;
+$session->allowedUrls           = ['index.php'];  // guest-accessible pages
+$session->ignoreInAuthorization = ['login.php', 'logout.php']; // bypass URL check
+$session->activateSession();
+```
+
+```php
+// login.php — after credential validation
+$session->createUserSession($userId);
+
+// Grant access to private pages:
+$_SESSION['sessionadmin']['allowedUrl'][] = 'dashboard.php';
+$_SESSION['sessionadmin']['allowedUrl'][] = 'profile.php';
+```
+
+```php
+// logout.php — must be in ignoreInAuthorization
+$session->terminate(); // wipes session, redirects to index.php
+```
+
+**Important:** Any file that handles auth state transitions (login processor, logout handler) must be in `$ignoreInAuthorization`. If it is not, the URL check runs before `terminate()` or `createUserSession()` can execute, and the browser is redirected away before the action completes.
+
+## Custom session storage
+
+Pass any `\SessionHandlerInterface` implementation before `activateSession()`:
+
+```php
+$session = new App\MySession();
+$session->setSessionHandler(new RedisSessionHandler($redis));
+$session->activateSession();
+```
+
+The handler is registered via `session_set_save_handler()` with shutdown auto-close enabled.
+
+## Security behaviors
+
+**Hijacking detection:** On every request, the package compares the stored IP prefix and User-Agent against the incoming request. If either changed, the session is destroyed and a new guest session starts. The number of IP octets compared is controlled by `$ipOctetsToCheck` (2–4). With `$proxyAwareIpDetection = true`, the IP is read from proxy headers; with `false`, only `REMOTE_ADDR` is used.
+
+**Session ID regeneration:** ID is always regenerated on login (`createUserSession()`). On subsequent requests, there is a ~3% chance of random regeneration to resist fixation and side-channel attacks.
+
+**Lifetime enforcement:** If `time_sinceLastRequest` exceeds `$sessionLifetime`, the session is destroyed and a guest session starts. The check happens on every `activateSession()` call.
+
+**URL authorization (MPA):** Compares `basename($_SERVER['SCRIPT_NAME'])` against `$allowedUrls`. Files in `$ignoreInAuthorization` are exempt. Unauthorized guests are redirected to `index.php`. Does not run in SPA mode.
+
+## Contracts (interfaces)
+
+**`Seba1rx\SessionAdmin\Contracts\SessionInterface`** — the public API contract. Type-hint against this to decouple consumers from the concrete class:
+
+```php
+use Seba1rx\SessionAdmin\Contracts\SessionInterface;
+
+function boot(SessionInterface $session): void
+{
+    $session->activateSession();
+}
+```
+
+Methods: `activateSession()`, `createUserSession(mixed $id)`, `terminate()`.
+
+**`Seba1rx\SessionAdmin\Contracts\TabHandlerInterface`** — contract for per-tab session handlers. Implemented by `seba1rx/tabmanager` via `SessionAdminBridge`. Inject via `setTabHandler()`.
+
+Methods: `indexNewTab()`, `touchTab()`, `set()`, `get()`, `isTabIndexed()`, `markInactiveTab()`, `destroyTabSession()`, `cleanupInactiveTabs()`.
+
+## Integration with seba1rx/tabmanager
+
+Per-browser-tab session isolation is provided by [`seba1rx/tabmanager`](https://packagist.org/packages/seba1rx/tabmanager). Install both:
+
+```bash
+composer require seba1rx/sessionadmin seba1rx/tabmanager
+```
+
+Use `SessionAdminBridge` (shipped with tabmanager) instead of `TabManager` directly. The bridge extends `TabManager` and implements `TabHandlerInterface`, but does **not** call `session_start()` in its constructor — `activateSession()` owns the session lifecycle.
+
+### Wiring (every PHP entry point)
+
+```php
+use App\MySession;
+use Seba1rx\TabManager\Bridge\SessionAdminBridge;
+
+$session = new MySession();
+$session->setTabHandler(new SessionAdminBridge()); // before activateSession()
+$session->autoCleanupTabs = 30;                   // prune tabs inactive > 30 s (optional)
+$session->activateSession();
+
+// Tab-scoped storage (after JS client registers the tab):
+$session->tabHandler->set('cart', $items);
+$cart  = $session->tabHandler->get('cart');
+$ready = $session->tabHandler->isTabIndexed(); // false until JS registers this tab
+```
+
+### Session data with tabmanager
+
+Both packages write to distinct top-level keys and never collide:
+
+```
+$_SESSION
+├── sessionadmin/   → auth, timing, security checks (managed by SessionAdmin)
+└── tabmanager/     → per-tab data, last_active, is_active (managed by TabManager)
+```
+
+### Lifecycle ordering
+
+```
+$session->setTabHandler(new SessionAdminBridge())
+  └─ bridge stores the store reference but does NOT call session_start()
+
+$session->activateSession()
+  ├─ session_name($this->sessionName)   ← session name applied before start
+  ├─ session_set_cookie_params(…)
+  ├─ session_start()                    ← session opens here
+  ├─ … security checks …
+  └─ $tabHandler->cleanupInactiveTabs($n)  ← tab cleanup runs after session is open
+```
+
+**Order matters.** `setTabHandler()` must be called before `activateSession()` so the bridge has access to the session once it starts.
+
+### MySession with tabmanager
+
+```php
+class MySession extends SessionAdmin
+{
+    public function __construct()
+    {
+        $this->sessionName     = 'my_app';
+        $this->sessionLifetime = 3600;
+        $this->autoCleanupTabs = 30; // run cleanupInactiveTabs(30) on every activateSession()
+    }
+}
+```
+
+### Tab-scoped data access
+
+```php
+// Write — visible only to the current browser tab
+$session->tabHandler->set('wizard_step', 3);
+
+// Read — returns null if tab not registered or key absent
+$step = $session->tabHandler->get('wizard_step');
+
+// Guard against unregistered tabs
+if ($session->tabHandler->isTabIndexed()) {
+    $session->tabHandler->set('ready', true);
+}
+```
+
+### JS client integration
+
+tabmanager's JS client sends a `X-TabManager-TabId` header on every AJAX request. The PHP bridge reads this header to route reads/writes to the correct session slot. Include `seba1rx_tabmanagerclient.js` (copied to project root by `composer install`):
+
+```html
+<head>
+    <script src="/seba1rx_tabmanagerclient.js"></script>
+</head>
+```
+
+Spread `TabManagerClient.getHeaders()` into every fetch call:
+
+```js
+await TabManagerClient.ready; // wait for UUID to be confirmed
+
+const res = await fetch('/endpoint.php', {
+    method: 'POST',
+    headers: {
+        'Content-Type': 'application/json',
+        ...TabManagerClient.getHeaders(), // X-TabManager-TabId: <uuid>
+    },
+    body: JSON.stringify(payload),
+});
+```
+
+### Bootstrap endpoints and custom session names
+
+tabmanager auto-registers `/tabmanager/new-tab`, `/tabmanager/heartbeat`, and `/tabmanager/tab-close` via `bin/bootstrap.php`. These endpoints create `new TabManager()` internally, which opens a session with PHP's default name (`PHPSESSID`) unless the session name is set first.
+
+If `$sessionName` is not the default, either:
+
+**Option A** — set `session_name()` before the autoload in a front-controller that handles all requests:
+
+```php
+session_name('my_app'); // must match $this->sessionName
+require 'vendor/autoload.php';
+```
+
+**Option B** — route tab registration and heartbeat requests through custom endpoint files that call `$session->activateSession()` first (as the `demo/tabmanager/` demo does with `session.php` and `heartbeat.php`).
+
+## Testing
+
+```bash
+composer test
+```
+
+Tests use a concrete subclass of `SessionAdmin` with overrides for `setCookie()`, `getCookie()`, and `redirectToIndex()` so no real HTTP headers or exits occur. PHPUnit stubs/mocks are used for `TabHandlerInterface` — no concrete `TabManager` dependency in tests.
+
+```php
+// Mock pattern for TabHandlerInterface in tests
+$handler = $this->createMock(TabHandlerInterface::class);
+$handler->expects($this->once())
+        ->method('cleanupInactiveTabs')
+        ->with(30);
+
+$session = new MyTestSession();
+$session->setTabHandler($handler);
+$session->autoCleanupTabs = 30;
+$session->activateSession();
+```
+
+## Common mistakes
+
+| Mistake | Consequence | Fix |
+|---------|-------------|-----|
+| Not extending `SessionAdmin` | Cannot instantiate — abstract class | Always extend and define a constructor |
+| Calling `session_start()` before `activateSession()` | Session name and cookie params not applied | Remove manual `session_start()`; `activateSession()` handles it |
+| Logout file not in `$ignoreInAuthorization` (MPA) | URL check runs before `terminate()`, redirects away | Add logout filename to `$ignoreInAuthorization` |
+| Calling `setSessionHandler()` after `activateSession()` | Handler not applied — session already open | Always call before `activateSession()` |
+| Calling `setTabHandler()` after `activateSession()` | Handler set but cleanup already ran; session name may not match | Always call before `activateSession()` |
+| Using `TabManager` directly instead of `SessionAdminBridge` | `TabManager` calls `session_start()` in constructor, before session name is set | Use `SessionAdminBridge` when integrating with sessionadmin |
+| Omitting `TabManagerClient.getHeaders()` in a fetch | Cookie fallback used; all tabs share same session slot | Always spread headers into every AJAX request |
+| Reading tab data before `await TabManagerClient.ready` | `tab.id` is `null`; requests fail silently | Await `TabManagerClient.ready` before any tab operation |
+| Setting `$autoCleanupTabs` without calling `setTabHandler()` | Property is ignored — no handler to clean up | Both must be set; `autoCleanupTabs > 0` is only meaningful with a handler |
