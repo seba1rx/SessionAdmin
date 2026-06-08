@@ -20,7 +20,6 @@ class ComposerStaticInit3fc4d201b7dfa563b2e237b72c6f7f9a
         '23c18046f52bef3eea034657bafda50f' => __DIR__ . '/..' . '/symfony/polyfill-php81/bootstrap.php',
         '9d2b9fc6db0f153a0a149fefb182415e' => __DIR__ . '/..' . '/symfony/polyfill-php84/bootstrap.php',
         'ec07570ca5a812141189b1fa81503674' => __DIR__ . '/..' . '/phpunit/phpunit/src/Framework/Assert/Functions.php',
-        '4db63912e68cebb3c180988a61a1fb15' => __DIR__ . '/../..' . '/bin/bootstrap.php',
     );
 
     public static $prefixLengthsPsr4 = array (
@@ -44,7 +43,6 @@ class ComposerStaticInit3fc4d201b7dfa563b2e237b72c6f7f9a
             'Seld\\PharUtils\\' => 15,
             'Seld\\JsonLint\\' => 14,
             'Seba1rx\\SessionAdmin\\Tests\\' => 27,
-            'Seba1rx\\SessionAdmin\\Exceptions\\' => 32,
             'Seba1rx\\SessionAdmin\\Build\\' => 27,
             'Seba1rx\\SessionAdmin\\' => 21,
         ),
@@ -155,10 +153,6 @@ class ComposerStaticInit3fc4d201b7dfa563b2e237b72c6f7f9a
         'Seba1rx\\SessionAdmin\\Tests\\' => 
         array (
             0 => __DIR__ . '/../..' . '/tests',
-        ),
-        'Seba1rx\\SessionAdmin\\Exceptions\\' => 
-        array (
-            0 => __DIR__ . '/../..' . '/Exceptions',
         ),
         'Seba1rx\\SessionAdmin\\Build\\' => 
         array (

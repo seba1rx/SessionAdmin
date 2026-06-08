@@ -98,9 +98,9 @@ Set these on your implementation instance before calling `activateSession()`:
 | `$ignoreInAuthorization` | `[]` | Files excluded from URL auth check |
 | `$autoCleanupTabs` | `0` | Seconds threshold for auto-pruning inactive tabs (requires `setTabHandler()`; `0` disables) |
 
-### Composer plugin (`build/SessionAdminPlugin.php`)
+### `build/SessionAdminPlugin.php`
 
-Registered as a Composer plugin (`"type": "composer-plugin"`). Currently a no-op stub kept for backwards compatibility — consumers who already depend on the plugin class in their `composer.json` do not break on update.
+No-op stub kept for backwards compatibility. The package type is `"library"` — it is no longer registered as a Composer plugin. The class remains so that consumers who have `"extra": {"class": "Seba1rx\\SessionAdmin\\Build\\SessionAdminPlugin"}` in their own `composer.json` do not break on update.
 
 ## Implementing the package
 
@@ -170,8 +170,8 @@ PHPUnit configuration is in `phpunit.xml`. Run with `composer test`.
 | Directory | Description |
 |---|---|
 | `demo/basic/` | Minimal single-file demo: login/logout |
-| `demo/MPA/` | Multi-page app: URL authorization, `$allowedUrls`, multiple PHP pages |
-| `demo/SPA/` | Single-page app: SPA mode, AJAX login |
+| `demo/mpa/` | Multi-page app: URL authorization, `$allowedUrls`, multiple PHP pages |
+| `demo/spa/` | Single-page app: SPA mode, AJAX login |
 | `demo/tabmanager/` | Integration demo: SessionAdmin + TabManager via `SessionAdminBridge` |
 
 Each demo has its own `composer.json` and `vendor/`.
