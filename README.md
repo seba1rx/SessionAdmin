@@ -175,6 +175,7 @@ $session->setTabHandler($mockTabs);
 | [`demo/basic/`](demo/basic/) | Minimal login/logout — the simplest possible implementation |
 | [`demo/mpa/`](demo/mpa/) | Multi-page app with URL authorization and `$allowedUrls` |
 | [`demo/spa/`](demo/spa/) | Single-page app, SPA mode, AJAX login |
+| [`demo/tabmanager/`](demo/tabmanager/) | SessionAdmin + TabManager integration — shared session, per-tab data isolation |
 
 Each demo is self-contained with its own `composer.json`.
 

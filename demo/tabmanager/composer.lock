@@ -1,0 +1,133 @@
+{
+    "_readme": [
+        "This file locks the dependencies of your project to a known state",
+        "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
+        "This file is @generated automatically"
+    ],
+    "content-hash": "adbd18c07b0397097b08df736c4dd458",
+    "packages": [
+        {
+            "name": "seba1rx/sessionadmin",
+            "version": "dev-main",
+            "dist": {
+                "type": "path",
+                "url": "../..",
+                "reference": "ea109f571c68f2bf558dbcec5fa1402ae7dbef9f"
+            },
+            "require": {
+                "composer-plugin-api": "^2.0",
+                "php": ">=8.1"
+            },
+            "require-dev": {
+                "composer/composer": "^2.0",
+                "phpunit/phpunit": "*"
+            },
+            "type": "composer-plugin",
+            "extra": {
+                "class": "Seba1rx\\SessionAdmin\\Build\\SessionAdminPlugin"
+            },
+            "autoload": {
+                "psr-4": {
+                    "Seba1rx\\SessionAdmin\\": "src/",
+                    "Seba1rx\\SessionAdmin\\Exceptions\\": "Exceptions/",
+                    "Seba1rx\\SessionAdmin\\Build\\": "build/"
+                }
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "Seba1rx\\SessionAdmin\\Tests\\": "tests/"
+                }
+            },
+            "scripts": {
+                "test": [
+                    "XDEBUG_MODE=off phpunit --colors=always"
+                ],
+                "coverage": [
+                    "XDEBUG_MODE=coverage phpunit --colors=always --coverage-text --coverage-html=coverage --coverage-clover=coverage/clover.xml"
+                ]
+            },
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Sebastian Basilio",
+                    "email": "seba1rx@gmail.com"
+                }
+            ],
+            "description": "php session admin featuring url control and security against hijicking",
+            "transport-options": {
+                "relative": true
+            }
+        },
+        {
+            "name": "seba1rx/tabmanager",
+            "version": "dev-main",
+            "dist": {
+                "type": "path",
+                "url": "/home/legion/dev/proyectos/tabmanager",
+                "reference": "13390da157aa7dbd91675efb35a59841a403109a"
+            },
+            "require": {
+                "php": ">=8.1"
+            },
+            "require-dev": {
+                "phpunit/phpunit": "^10.0"
+            },
+            "suggest": {
+                "seba1rx/sessionadmin": "Provides TabHandlerInterface — required to use SessionAdminBridge for integration with seba1rx/sessionadmin."
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Seba1rx\\TabManager\\": "src/"
+                },
+                "files": [
+                    "bin/bootstrap.php"
+                ]
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "Seba1rx\\TabManager\\Tests\\": "tests/"
+                }
+            },
+            "scripts": {
+                "test": [
+                    "phpunit --colors=always"
+                ],
+                "post-install-cmd": [
+                    "php -r \"copy(__DIR__.'/assets/seba1rx_tabmanagerclient.js', getcwd().'/seba1rx_tabmanagerclient.js');\""
+                ],
+                "post-update-cmd": [
+                    "php -r \"copy(__DIR__.'/assets/seba1rx_tabmanagerclient.js', getcwd().'/seba1rx_tabmanagerclient.js');\""
+                ]
+            },
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Sebastián Basilio"
+                }
+            ],
+            "description": "a simple php bootstrapped solution for session indexed browser tabs",
+            "transport-options": {
+                "relative": false
+            }
+        }
+    ],
+    "packages-dev": [],
+    "aliases": [],
+    "minimum-stability": "dev",
+    "stability-flags": {
+        "seba1rx/sessionadmin": 20,
+        "seba1rx/tabmanager": 20
+    },
+    "prefer-stable": false,
+    "prefer-lowest": false,
+    "platform": {
+        "php": ">=8.1"
+    },
+    "platform-dev": {},
+    "plugin-api-version": "2.6.0"
+}

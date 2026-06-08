@@ -172,5 +172,6 @@ PHPUnit configuration is in `phpunit.xml`. Run with `composer test`.
 | `demo/basic/` | Minimal single-file demo: login/logout |
 | `demo/MPA/` | Multi-page app: URL authorization, `$allowedUrls`, multiple PHP pages |
 | `demo/SPA/` | Single-page app: SPA mode, AJAX login |
+| `demo/tabmanager/` | Integration demo: SessionAdmin + TabManager via `SessionAdminBridge` |
 
 Each demo has its own `composer.json` and `vendor/`.

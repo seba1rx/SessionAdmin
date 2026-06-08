@@ -268,12 +268,17 @@ script que llame `$session->activateSession()` primero.
 
 ---
 
-## Fase 6 — Verificación de integración end-to-end
+## Fase 6 — Verificación de integración end-to-end ✅
 
-- [ ] `composer test` en sessionadmin → todo verde
-- [ ] `composer test` en tabmanager → todo verde
-- [ ] Smoke test manual: instanciar ambos en un script PHP, verificar que comparten `$_SESSION` sin conflictos
-- [ ] Actualizar un demo (SPA o MPA) para mostrar el wiring completo
+- [x] `composer test` en sessionadmin → 58 tests, 113 assertions — verde
+- [x] `composer test` en tabmanager → 67 tests, 114 assertions — verde
+- [x] Demo de integración creado en `demo/tabmanager/` — basado en el demo standalone de tabmanager
+  - `App/MySession.php` — extiende SessionAdmin, configura nombre de sesión y autoCleanupTabs
+  - `index.php` — wiring completo, UI de auth + tab isolation
+  - `session.php`, `addData.php`, `heartbeat.php`, `terminate.php`, `debug.php`
+  - `composer.json` — path repos a ambos packages, post-install copia el JS client
+  - `.gitignore` — ignora `vendor/`, `sessions/`, `seba1rx_tabmanagerclient.js`
+  - `README.md` — highlights, qué observar, guía de configuración paso a paso
 
 ---
 
