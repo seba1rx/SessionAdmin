@@ -171,7 +171,7 @@ $now          = time();
 
 <script>
     const toggle = document.getElementById('auto-refresh');
-    setInterval(() => { if (toggle.checked) location.reload(); }, 3000);
+    setInterval(() => { if (toggle.checked) location.reload(); }, 10000);
 
     async function deleteTab(tabId, btn) {
         if (!confirm('Delete session data for this tab?')) return;
