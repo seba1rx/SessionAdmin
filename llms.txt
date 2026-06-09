@@ -329,9 +329,45 @@ const res = await fetch('/endpoint.php', {
 });
 ```
 
+### Tab session loss (`autoCleanupTabs` + `tabmanager:session-lost`)
+
+When `$autoCleanupTabs > 0`, SessionAdmin calls `cleanupInactiveTabs($n)` on every `activateSession()`. If the browser suspends a tab (Chrome Memory Saver, OS memory pressure), the JS heartbeat pauses and the tab may be pruned while invisible.
+
+When the user returns to the tab, tabmanager's JS client fires a GET to `/tabmanager/tab-status`. If `indexed` is `false`, it dispatches `tabmanager:session-lost` on `document` and does **not** resume the heartbeat. The event carries `{ tabId: '<uuid>' }`.
+
+```js
+document.addEventListener('tabmanager:session-lost', (e) => {
+    // e.detail.tabId — the UUID of the pruned tab
+    // Heartbeat is already stopped. Show a warning or reload.
+    showSessionLostBanner();
+});
+```
+
+Override the status endpoint URL when using `php -S` (no router):
+
+```html
+<script>
+    window.TABMANAGER_TAB_STATUS_URL = 'tab_status.php';
+</script>
+<script src="/seba1rx_tabmanagerclient.js"></script>
+```
+
+`tab_status.php` must start the session with the correct name before calling the static helper:
+
+```php
+// tab_status.php
+$session = new App\MySession();                    // sets session name in constructor
+$session->setTabHandler(new SessionAdminBridge());
+$session->activateSession();                       // starts session with correct name
+
+TabManager::handleTabStatusRequest();              // reads header, checks indexed, outputs JSON, exits
+```
+
+`TabManager::handleTabStatusRequest()` is a static `never`-returning method: it reads `X-TabManager-TabId`, validates the UUID, checks if the tab is registered in `$_SESSION`, outputs `{ "indexed": bool, "tab_id": "..." }`, and calls `exit`. It does **not** call `session_start()` — the caller owns the session setup.
+
 ### Bootstrap endpoints and custom session names
 
-tabmanager auto-registers `/tabmanager/new-tab`, `/tabmanager/heartbeat`, and `/tabmanager/tab-close` via `bin/bootstrap.php`. These endpoints create `new TabManager()` internally, which opens a session with PHP's default name (`PHPSESSID`) unless the session name is set first.
+tabmanager auto-registers `/tabmanager/new-tab`, `/tabmanager/heartbeat`, `/tabmanager/tab-close`, and `/tabmanager/tab-status` via `bin/bootstrap.php`. These endpoints create `new TabManager()` internally, which opens a session with PHP's default name (`PHPSESSID`) unless the session name is set first.
 
 If `$sessionName` is not the default, either:
 
@@ -342,7 +378,7 @@ session_name('my_app'); // must match $this->sessionName
 require 'vendor/autoload.php';
 ```
 
-**Option B** — route tab registration and heartbeat requests through custom endpoint files that call `$session->activateSession()` first (as the `demo/tabmanager/` demo does with `session.php` and `heartbeat.php`).
+**Option B** — route tab registration, heartbeat, and tab-status requests through custom endpoint files that call `$session->activateSession()` first (as the `demo/tabmanager/` demo does with `session.php`, `heartbeat.php`, and `tab_status.php`).
 
 ## Testing
 

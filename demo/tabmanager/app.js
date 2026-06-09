@@ -158,6 +158,31 @@ function reset() {
  * AFTER TabManagerClient.ready resolves. If you read tab.id synchronously on
  * DOMContentLoaded you will get null.
  */
+/**
+ * INTEGRATION: handling tab session loss.
+ *
+ * When autoCleanupTabs is set, SessionAdmin prunes inactive tabs on every
+ * request. If the browser suspends this tab (Chrome Memory Saver, OS memory
+ * pressure), the heartbeat pauses and the tab may be pruned while invisible.
+ *
+ * When the user returns, TabManagerClient checks /tabmanager/tab-status. If
+ * the tab is no longer indexed, it fires this event and stops the heartbeat.
+ * The app must decide what to do — here we show a warning banner.
+ */
+document.addEventListener('tabmanager:session-lost', () => {
+    const banner = document.createElement('div');
+    banner.className = 'alert alert-warning d-flex align-items-center gap-3 rounded-0 mb-0';
+    banner.setAttribute('role', 'alert');
+    banner.innerHTML = `
+        <span>
+            <strong>Tab session expired.</strong>
+            This tab was inactive and its session data was removed.
+        </span>
+        <button class="btn btn-sm btn-warning ms-auto" onclick="location.reload()">Reload</button>
+    `;
+    document.body.prepend(banner);
+});
+
 document.addEventListener('DOMContentLoaded', async () => {
     await TabManagerClient.ready; // wait for UUID to be confirmed and unique
 

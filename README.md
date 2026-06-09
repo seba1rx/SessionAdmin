@@ -138,6 +138,20 @@ $ready = $session->tabHandler->isTabIndexed(); // false until JS registers the t
 
 `SessionAdminBridge` extends `TabManager` but does not call `session_start()` in its constructor — `activateSession()` owns the session lifecycle and configures the session name and cookie parameters before the session starts. Both packages write to distinct keys in `$_SESSION` (`sessionadmin` vs `tabmanager`) and do not interfere with each other.
 
+#### Tab session loss (`autoCleanupTabs` + `tabmanager:session-lost`)
+
+When `$autoCleanupTabs` is set, SessionAdmin prunes inactive tabs on every `activateSession()` call. If the browser suspends a tab (Chrome Memory Saver, OS memory pressure), the JS heartbeat pauses — and the tab may be pruned while invisible. When the user returns, tabmanager's JS client checks `/tabmanager/tab-status`. If the tab is no longer indexed, it fires a `tabmanager:session-lost` event on `document` and stops the heartbeat. Listen for this event to show a warning or prompt the user to reload:
+
+```js
+document.addEventListener('tabmanager:session-lost', () => {
+    // Tab data was pruned by autoCleanupTabs while the tab was suspended.
+    // Show a warning and let the user decide whether to reload.
+    showSessionLostBanner();
+});
+```
+
+The event carries `event.detail.tabId` with the UUID of the lost tab.
+
 ---
 
 ## Contracts (interfaces)

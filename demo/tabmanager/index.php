@@ -72,8 +72,9 @@ $initialSession = json_encode($_SESSION, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX
         the default endpoint is registered automatically by the bootstrap.
     -->
     <script>
-        window.TABMANAGER_DEBUG       = true;
-        window.TABMANAGER_HEARTBEAT_URL = 'heartbeat.php';
+        window.TABMANAGER_DEBUG          = true;
+        window.TABMANAGER_HEARTBEAT_URL  = 'heartbeat.php';
+        window.TABMANAGER_TAB_STATUS_URL = 'tab_status.php';
     </script>
 
     <!--
