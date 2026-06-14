@@ -43,7 +43,6 @@ class ComposerStaticInit3fc4d201b7dfa563b2e237b72c6f7f9a
             'Seld\\PharUtils\\' => 15,
             'Seld\\JsonLint\\' => 14,
             'Seba1rx\\SessionAdmin\\Tests\\' => 27,
-            'Seba1rx\\SessionAdmin\\Build\\' => 27,
             'Seba1rx\\SessionAdmin\\' => 21,
         ),
         'R' => 
@@ -153,10 +152,6 @@ class ComposerStaticInit3fc4d201b7dfa563b2e237b72c6f7f9a
         'Seba1rx\\SessionAdmin\\Tests\\' => 
         array (
             0 => __DIR__ . '/../..' . '/tests',
-        ),
-        'Seba1rx\\SessionAdmin\\Build\\' => 
-        array (
-            0 => __DIR__ . '/../..' . '/build',
         ),
         'Seba1rx\\SessionAdmin\\' => 
         array (
