@@ -3,6 +3,7 @@
     "description": "PHP session management with security hardening, hijacking detection, and URL authorization for MPA and SPA applications",
     "type": "library",
     "license": "MIT",
+    "keywords": ["session", "security", "authentication", "hijacking", "mpa", "spa", "php"],
     "authors": [
         {
             "name": "Sebastian Basilio",
@@ -11,8 +12,7 @@
     ],
     "autoload": {
         "psr-4": {
-            "Seba1rx\\SessionAdmin\\": "src/",
-            "Seba1rx\\SessionAdmin\\Build\\": "build/"
+            "Seba1rx\\SessionAdmin\\": "src/"
         }
     },
     "scripts": {

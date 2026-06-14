@@ -1,0 +1,13 @@
+# Export-ignore — these paths are excluded from dist archives (composer require).
+# Consumers get src/, build/, LICENSE, README.md, and composer.json only.
+
+/.gitattributes     export-ignore
+/.gitignore         export-ignore
+/composer.lock      export-ignore
+/phpunit.xml        export-ignore
+/llms.txt           export-ignore
+/.phpunit.cache     export-ignore
+/coverage           export-ignore
+/build              export-ignore
+/tests              export-ignore
+/demo               export-ignore
